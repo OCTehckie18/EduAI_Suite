@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import PPTXViewer from "./PPTXViewer";
+import { API_BASE_URL } from "../../shared/utils/gameAPI";
 
 interface Poll {
   id: number;
@@ -104,7 +105,7 @@ const LiveSessionInterface: React.FC<Props> = ({
   // Fetch predefined interactions for this submission
   useEffect(() => {
     if (propsSubmissionId && isPresenter) {
-      fetch(`/api/slido/submissions/${propsSubmissionId}/interactions`)
+      fetch(`${API_BASE_URL}/slido/submissions/${propsSubmissionId}/interactions`)
         .then((r) => r.json())
         .then((data) => setPreloadedInteractions(Array.isArray(data) ? data : []))
         .catch(console.error);
@@ -143,9 +144,25 @@ const LiveSessionInterface: React.FC<Props> = ({
 
   const connectWebSocket = () => {
     const userType = isPresenter ? "presenter" : "student";
-    const ws = new WebSocket(
-      `/ws/slido/${sessionPin}?user_type=${userType}&user_id=${studentId}`,
-    );
+    
+    const cleanUrl = API_BASE_URL.trim();
+    let wsUrl = "";
+    const path = `/ws/slido/${sessionPin}?user_type=${userType}&user_id=${studentId}`;
+    if (cleanUrl.startsWith("/")) {
+      const loc = window.location;
+      const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+      const wsHost = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") 
+        ? `${loc.hostname}:8000` 
+        : loc.host;
+      const pathPrefix = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") ? "" : cleanUrl;
+      wsUrl = `${protocol}//${wsHost}${pathPrefix}${path}`;
+    } else {
+      const absUrl = new URL(cleanUrl);
+      const wsProtocol = absUrl.protocol === "https:" ? "wss:" : "ws:";
+      wsUrl = `${wsProtocol}//${absUrl.host}${absUrl.pathname === "/" ? "" : absUrl.pathname}${path}`;
+    }
+
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log("WebSocket connected");

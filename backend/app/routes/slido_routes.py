@@ -297,10 +297,10 @@ async def create_session(
     teacher_id: int = Query(...)
 ):
     """Start a new Slido session"""
-    teacher = await User.find_one(User.int_id == teacher_id)
-    if not teacher or teacher.role != "teacher":
+    user = await User.find_one(User.int_id == teacher_id)
+    if not user:
         raise HTTPException(
-            status_code=403, detail="Only teachers can start sessions")
+            status_code=403, detail="User not found")
 
     if session_data.assignment_id:
         assignment = await PresentationAssignment.find_one(PresentationAssignment.int_id == session_data.assignment_id)

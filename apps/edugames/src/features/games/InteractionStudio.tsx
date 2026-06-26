@@ -19,6 +19,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import PPTXViewer from "./PPTXViewer";
+import { API_BASE_URL } from "../../shared/utils/gameAPI";
 
 // ─── Types ────────────────────────────────────────────────────────
 interface Interaction {
@@ -88,7 +89,7 @@ const InteractionStudio: React.FC<Props> = ({
   const fetchInteractions = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/slido/submissions/${submissionId}/interactions`);
+      const res = await fetch(`${API_BASE_URL}/slido/submissions/${submissionId}/interactions`);
       if (res.ok) {
         setInteractions(await res.json());
       }
@@ -142,13 +143,13 @@ const InteractionStudio: React.FC<Props> = ({
     try {
       let res: Response;
       if (editingId) {
-        res = await fetch(`/api/slido/submissions/interactions/${editingId}`, {
+        res = await fetch(`${API_BASE_URL}/slido/submissions/interactions/${editingId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
       } else {
-        res = await fetch(`/api/slido/submissions/${submissionId}/interactions`, {
+        res = await fetch(`${API_BASE_URL}/slido/submissions/${submissionId}/interactions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -172,7 +173,7 @@ const InteractionStudio: React.FC<Props> = ({
   // ─── Delete interaction ───────────────────────────────────────
   const handleDelete = async (interactionId: number) => {
     try {
-      await fetch(`/api/slido/submissions/interactions/${interactionId}`, { method: "DELETE" });
+      await fetch(`${API_BASE_URL}/slido/submissions/interactions/${interactionId}`, { method: "DELETE" });
       await fetchInteractions();
     } catch (err) {
       console.error("Delete failed", err);
@@ -193,7 +194,7 @@ const InteractionStudio: React.FC<Props> = ({
   const handleFinalize = async () => {
     setFinalizing(true);
     try {
-      const res = await fetch(`/api/slido/submissions/${submissionId}/submit`, { method: "PUT" });
+      const res = await fetch(`${API_BASE_URL}/slido/submissions/${submissionId}/submit`, { method: "PUT" });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.detail || "Finalize failed");

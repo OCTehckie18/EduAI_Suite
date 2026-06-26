@@ -61,6 +61,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     submitWord,
     startGame: wsStartGame,
     endGame: wsEndGame,
+    nextQuestion: wsNextQuestion,
     skipTurn: wsSkipTurn,
   } = useGameSync({
     sessionId: syncEnabled ? sessionId! : "",
@@ -87,6 +88,16 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
     (gameState as any)?.status ||
     (gameState as any)?.game?.status ||
     "setup";
+
+  const questions =
+    (gameState as any)?.questions ||
+    (gameState as any)?.game?.questions ||
+    [];
+
+  const currentQuestionIndex =
+    (gameState as any)?.current_question_index ??
+    (gameState as any)?.game?.current_question_index ??
+    0;
 
   const currentPlayerIndex = gameState?.currentPlayerIndex ?? 0;
   const players = gameState?.players || [];
@@ -577,6 +588,17 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
         </div>
       </div>
 
+      {questions.length > 0 && (
+        <GlassCard className="p-4 flex justify-between items-center bg-blue-500/5">
+          <span className="font-semibold text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            Progress: Question <strong>{currentQuestionIndex + 1}</strong> of <strong>{questions.length}</strong>
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-blue-500/10 text-blue-500">
+            Prompt: "{(gameState as any)?.starting_word || (gameState as any)?.session?.startingWord || (gameState as any)?.game?.starting_word}"
+          </span>
+        </GlassCard>
+      )}
+
       {/* Current Word Display */}
       <GlassCard className="p-12 text-center border-2 border-blue-500/50">
         <p
@@ -736,6 +758,24 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
             <Square size={18} />
             End Game
           </button>
+          
+          {questions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (syncEnabled) {
+                  wsNextQuestion();
+                }
+              }}
+              className="px-6 py-3 rounded-lg font-semibold text-white flex items-center gap-2 hover:scale-105 active:scale-95 transition-transform"
+              style={{
+                background: "linear-gradient(135deg, #10b981, #059669)",
+              }}
+            >
+              <Play size={18} />
+              Next Question
+            </button>
+          )}
         </div>
       )}
 

@@ -26,6 +26,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import PPTXViewer from "./PPTXViewer";
+import { API_BASE_URL } from "../../shared/utils/gameAPI";
 
 // ─── Types ────────────────────────────────────────────────────
 interface PreloadedInteraction {
@@ -118,7 +119,7 @@ const PresenterView: React.FC<Props> = ({ submissionId, fileUrl, fileName, onBac
 
   // ─── Fetch Interactions ───────────────────────────────────
   useEffect(() => {
-    fetch(`/api/slido/submissions/${submissionId}/interactions`)
+    fetch(`${API_BASE_URL}/slido/submissions/${submissionId}/interactions`)
       .then((r) => r.json())
       .then((data) => setInteractions(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -131,7 +132,7 @@ const PresenterView: React.FC<Props> = ({ submissionId, fileUrl, fileName, onBac
       // Use teacher_id=1 as fallback since the student initiates the session for their own presentation
       // In production, the teacher would create the session
       const teacherId = localStorage.getItem("teacher_id") || "1";
-      const res = await fetch(`/api/slido/sessions?teacher_id=${teacherId}`, {
+      const res = await fetch(`${API_BASE_URL}/slido/sessions?teacher_id=${teacherId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ submission_id: submissionId }),
@@ -152,9 +153,24 @@ const PresenterView: React.FC<Props> = ({ submissionId, fileUrl, fileName, onBac
 
   // ─── Connect WebSocket ────────────────────────────────────
   const connectWebSocket = (pin: string) => {
-    const ws = new WebSocket(
-      `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/slido/${pin}?user_type=teacher&user_id=${studentId}`
-    );
+    const cleanUrl = API_BASE_URL.trim();
+    let wsUrl = "";
+    const path = `/ws/slido/${pin}?user_type=presenter&user_id=${studentId}`;
+    if (cleanUrl.startsWith("/")) {
+      const loc = window.location;
+      const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+      const wsHost = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") 
+        ? `${loc.hostname}:8000` 
+        : loc.host;
+      const pathPrefix = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") ? "" : cleanUrl;
+      wsUrl = `${protocol}//${wsHost}${pathPrefix}${path}`;
+    } else {
+      const absUrl = new URL(cleanUrl);
+      const wsProtocol = absUrl.protocol === "https:" ? "wss:" : "ws:";
+      wsUrl = `${wsProtocol}//${absUrl.host}${absUrl.pathname === "/" ? "" : absUrl.pathname}${path}`;
+    }
+
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       setConnected(true);

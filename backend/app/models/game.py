@@ -28,6 +28,13 @@ class GameWord(BaseModel):
     validation_reason: Optional[str] = None
 
 
+class GameQuestion(BaseModel):
+    """Embedded sub-document for multiple questions."""
+    int_id: int = 0
+    question_text: str
+    order: int = 0
+
+
 class ChainAnswerGame(Document):
     int_id: int = 0
     session_id: Optional[str] = None
@@ -50,6 +57,8 @@ class ChainAnswerGame(Document):
     ended_at: Optional[datetime] = None
     players: List[GamePlayer] = []
     words: List[GameWord] = []
+    questions: List[GameQuestion] = []
+    current_question_index: int = 0
 
     class Settings:
         name = "chain_answer_games"

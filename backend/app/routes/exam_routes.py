@@ -5,6 +5,7 @@ from app.schemas.exam import ExamCreate, ExamResponse, ExamAttemptCreate, ExamAt
 from app.utils.auth import get_current_user
 from app.models.user import User
 from app.models.student import Student
+from app.models.course import Course
 import PyPDF2
 import docx
 import io
@@ -14,9 +15,11 @@ from datetime import datetime
 
 exam_router = APIRouter(prefix="/exams", tags=["Exams"])
 
-def format_exam_response(exam: Exam) -> dict:
+def format_exam_response(exam: Exam, course: Optional[dict] = None) -> dict:
     data = exam.model_dump()
     data["id"] = exam.int_id
+    if course:
+        data["course"] = course
     for q in data.get("questions", []):
         q["id"] = q.get("int_id", 0)
         for c in q.get("choices", []):
@@ -83,7 +86,9 @@ async def get_all_exams(course_id: Optional[int] = None, current_user: User = De
             if completed_attempts < e.attempts_allowed:
                 valid_exams.append(e)
                 
-        return [ExamResponse(**format_exam_response(e)) for e in valid_exams]
+        courses = await Course.find({"int_id": {"$in": [e.course_id for e in valid_exams]}}).to_list()
+        course_map = {c.int_id: {"id": c.int_id, "name": c.name, "code": c.code} for c in courses}
+        return [ExamResponse(**format_exam_response(e, course_map.get(e.course_id))) for e in valid_exams]
     
     # Teachers/Admins can see all or filter by course_id
     query = Exam.find_all()
@@ -91,7 +96,9 @@ async def get_all_exams(course_id: Optional[int] = None, current_user: User = De
         query = query.find(Exam.course_id == course_id)
         
     exams = await query.to_list()
-    return [ExamResponse(**format_exam_response(e)) for e in exams]
+    courses = await Course.find({"int_id": {"$in": [e.course_id for e in exams]}}).to_list()
+    course_map = {c.int_id: {"id": c.int_id, "name": c.name, "code": c.code} for c in courses}
+    return [ExamResponse(**format_exam_response(e, course_map.get(e.course_id))) for e in exams]
 
 @exam_router.post("/", response_model=ExamResponse)
 async def create_exam(exam_data: ExamCreate):

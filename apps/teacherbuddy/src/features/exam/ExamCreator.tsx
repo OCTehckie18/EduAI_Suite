@@ -184,6 +184,11 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
         setError("Exam title is required.");
         return;
     }
+
+    if (!courseId || isNaN(courseId)) {
+        setError("Please select a classroom.");
+        return;
+    }
     
     if (questions.length === 0) {
         setError("Please add at least one question.");

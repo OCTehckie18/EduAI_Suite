@@ -44,6 +44,21 @@ class GameWordResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# Game question schemas
+
+class GameQuestionCreate(BaseModel):
+    question_text: str
+
+
+class GameQuestionResponse(BaseModel):
+    id: int
+    question_text: str
+    order: int
+
+    class Config:
+        from_attributes = True
+
+
 # Game session schemas
 
 
@@ -60,6 +75,7 @@ class ChainAnswerGameCreate(BaseModel):
     penalty_on_invalid: bool = False
     penalty_type: Optional[str] = None
     players: List[GamePlayerCreate]
+    questions: Optional[List[GameQuestionCreate]] = []
 
 
 class ChainAnswerGameUpdate(BaseModel):
@@ -86,6 +102,8 @@ class ChainAnswerGameResponse(BaseModel):
     ended_at: Optional[datetime]
     players: List[GamePlayerResponse]
     words: List[GameWordResponse]
+    questions: Optional[List[GameQuestionResponse]] = []
+    current_question_index: Optional[int] = 0
 
     class Config:
         from_attributes = True

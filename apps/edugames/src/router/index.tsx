@@ -16,6 +16,7 @@ import { WordCloudPlayerPage } from "../features/games/WordCloudPlayerPage";
 import PresentationSubmissionPortal from "../features/games/PresentationSubmissionPortal";
 import LiveSessionInterface from "../features/games/LiveSessionInterface";
 import AudienceJoinHub from "../features/games/AudienceJoinHub";
+import { StudentCalendar } from "../features/calendar/StudentCalendar";
 
 import { WaitingPage } from "../features/auth/WaitingPage";
 
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
       { path: "games/trello/:boardId", element: <TrelloBoardView /> },
       { path: "trello", element: <TrelloBoardsPage /> },
       { path: "trello/:boardId", element: <TrelloBoardView /> },
+      { path: "calendar", element: <StudentCalendar /> },
       { path: "appointments", element: <AppointmentBookingPage /> },
       { path: "*", element: <ConstructionPage /> },
     ],

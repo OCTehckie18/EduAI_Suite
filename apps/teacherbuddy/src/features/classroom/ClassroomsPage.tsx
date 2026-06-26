@@ -172,7 +172,16 @@ export const ClassroomsPage: React.FC = () => {
         fetch(`${API_URL}/students/${selectedId}`).then((r) => r.json()),
         fetch(`${API_URL}/assignments/${selectedId}`).then((r) => r.json()),
       ]);
-      setAnnouncements(Array.isArray(ann) ? ann : []);
+      const sortedAnnouncements = Array.isArray(ann) 
+        ? ann.sort((a, b) => {
+            if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+            // Fallback to id if created_at is missing for older announcements
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : a.id;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : b.id;
+            return timeB - timeA;
+          })
+        : [];
+      setAnnouncements(sortedAnnouncements);
       setStudents(Array.isArray(stu) ? stu : []);
       setAssignments(Array.isArray(asgn) ? asgn : []);
       fetchCourses(); // to update student counts

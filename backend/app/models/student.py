@@ -16,6 +16,10 @@ class Student(Document):
 
     class Settings:
         name = "students"
+        indexes = [
+            [("email", 1), ("course_id", 1)],
+            [("registration_number", 1), ("course_id", 1)]
+        ]
 
     async def assign_id(self):
         if self.int_id == 0:

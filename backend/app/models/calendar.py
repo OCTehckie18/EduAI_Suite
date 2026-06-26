@@ -17,6 +17,7 @@ class CalendarEvent(Document):
     is_all_day: bool = False
     recurrence: Optional[str] = None
     teacher_name: Optional[str] = None
+    student_email: Optional[str] = None
     course_id: Optional[int] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

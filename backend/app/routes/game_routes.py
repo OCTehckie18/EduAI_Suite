@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from app.models.game import ChainAnswerGame, GamePlayer, GameWord
+from app.models.game import ChainAnswerGame, GamePlayer, GameWord, GameQuestion
 from app.models.student import Student
 from app.schemas.game import (
     ChainAnswerGameCreate,
@@ -15,6 +15,31 @@ import uuid
 import json
 
 game_router = APIRouter(prefix="/games", tags=["Games"])
+
+def format_game_response(game: ChainAnswerGame) -> dict:
+    res = game.model_dump()
+    res["id"] = game.int_id
+    
+    res["players"] = []
+    for p in game.players:
+        d = p.model_dump()
+        d["id"] = p.int_id
+        res["players"].append(d)
+        
+    res["words"] = []
+    for w in game.words:
+        d = w.model_dump()
+        d["id"] = w.int_id
+        res["words"].append(d)
+        
+    res["questions"] = []
+    for q in game.questions:
+        d = q.model_dump()
+        d["id"] = q.int_id
+        res["questions"].append(d)
+        
+    return res
+
 
 @game_router.post("/chain-answer", response_model=ChainAnswerGameResponse, status_code=status.HTTP_201_CREATED)
 async def create_chain_answer_game(game_data: ChainAnswerGameCreate):
@@ -58,6 +83,17 @@ async def create_chain_answer_game(game_data: ChainAnswerGameCreate):
         )
         players_list.append(new_player)
 
+    questions_list = []
+    if game_data.questions:
+        for idx, q_data in enumerate(game_data.questions, start=1):
+            questions_list.append(
+                GameQuestion(
+                    int_id=idx,
+                    question_text=q_data.question_text,
+                    order=idx
+                )
+            )
+
     starting_word_entry = GameWord(
         int_id=1,
         word=game_data.starting_word,
@@ -82,27 +118,14 @@ async def create_chain_answer_game(game_data: ChainAnswerGameCreate):
         ai_suggestions=word_suggestions,
         status="setup",
         players=players_list,
-        words=[starting_word_entry]
+        words=[starting_word_entry],
+        questions=questions_list,
+        current_question_index=0
     )
     await new_game.assign_id()
     await new_game.insert()
 
-    res = new_game.model_dump()
-    res["id"] = new_game.int_id
-    
-    res["players"] = []
-    for p in new_game.players:
-        d = p.model_dump()
-        d["id"] = p.int_id
-        res["players"].append(d)
-        
-    res["words"] = []
-    for w in new_game.words:
-        d = w.model_dump()
-        d["id"] = w.int_id
-        res["words"].append(d)
-        
-    return res
+    return format_game_response(new_game)
 
 
 @game_router.get("/chain-answer", response_model=list[ChainAnswerGameListResponse])
@@ -141,22 +164,7 @@ async def get_chain_answer_game(game_id: int):
             detail="Game not found"
         )
         
-    res = game.model_dump()
-    res["id"] = game.int_id
-    
-    res["players"] = []
-    for p in game.players:
-        d = p.model_dump()
-        d["id"] = p.int_id
-        res["players"].append(d)
-        
-    res["words"] = []
-    for w in game.words:
-        d = w.model_dump()
-        d["id"] = w.int_id
-        res["words"].append(d)
-        
-    return res
+    return format_game_response(game)
 
 
 @game_router.get("/chain-answer/session/{session_id}", response_model=ChainAnswerGameResponse)
@@ -169,22 +177,7 @@ async def get_chain_answer_game_by_session(session_id: str):
             detail="Game session not found"
         )
         
-    res = game.model_dump()
-    res["id"] = game.int_id
-    
-    res["players"] = []
-    for p in game.players:
-        d = p.model_dump()
-        d["id"] = p.int_id
-        res["players"].append(d)
-        
-    res["words"] = []
-    for w in game.words:
-        d = w.model_dump()
-        d["id"] = w.int_id
-        res["words"].append(d)
-        
-    return res
+    return format_game_response(game)
 
 
 @game_router.post("/chain-answer/{game_id}/start", response_model=ChainAnswerGameResponse)
@@ -213,22 +206,7 @@ async def start_chain_answer_game(game_id: int):
     game.started_at = datetime.utcnow()
     await game.save()
 
-    res = game.model_dump()
-    res["id"] = game.int_id
-    
-    res["players"] = []
-    for p in game.players:
-        d = p.model_dump()
-        d["id"] = p.int_id
-        res["players"].append(d)
-        
-    res["words"] = []
-    for w in game.words:
-        d = w.model_dump()
-        d["id"] = w.int_id
-        res["words"].append(d)
-        
-    return res
+    return format_game_response(game)
 
 
 @game_router.post("/chain-answer/{game_id}/word", response_model=GameWordResponse, status_code=status.HTTP_201_CREATED)
@@ -298,22 +276,7 @@ async def end_chain_answer_game(game_id: int):
     game.ended_at = datetime.utcnow()
     await game.save()
 
-    res = game.model_dump()
-    res["id"] = game.int_id
-    
-    res["players"] = []
-    for p in game.players:
-        d = p.model_dump()
-        d["id"] = p.int_id
-        res["players"].append(d)
-        
-    res["words"] = []
-    for w in game.words:
-        d = w.model_dump()
-        d["id"] = w.int_id
-        res["words"].append(d)
-        
-    return res
+    return format_game_response(game)
 
 
 @game_router.post("/chain-answer/{game_id}/pause", response_model=ChainAnswerGameResponse)
@@ -335,22 +298,7 @@ async def pause_chain_answer_game(game_id: int):
     game.status = "paused"
     await game.save()
 
-    res = game.model_dump()
-    res["id"] = game.int_id
-    
-    res["players"] = []
-    for p in game.players:
-        d = p.model_dump()
-        d["id"] = p.int_id
-        res["players"].append(d)
-        
-    res["words"] = []
-    for w in game.words:
-        d = w.model_dump()
-        d["id"] = w.int_id
-        res["words"].append(d)
-        
-    return res
+    return format_game_response(game)
 
 
 @game_router.post("/chain-answer/{game_id}/resume", response_model=ChainAnswerGameResponse)
@@ -372,22 +320,45 @@ async def resume_chain_answer_game(game_id: int):
     game.status = "active"
     await game.save()
 
-    res = game.model_dump()
-    res["id"] = game.int_id
-    
-    res["players"] = []
-    for p in game.players:
-        d = p.model_dump()
-        d["id"] = p.int_id
-        res["players"].append(d)
+    return format_game_response(game)
+
+
+@game_router.post("/chain-answer/{game_id}/next-question", response_model=ChainAnswerGameResponse)
+async def next_question(game_id: int):
+    """Advance to the next question in the game"""
+    game = await ChainAnswerGame.find_one(ChainAnswerGame.int_id == game_id)
+    if not game:
+        raise HTTPException(
+            status_code=404,
+            detail="Game not found"
+        )
+
+    if game.status != "active":
+        raise HTTPException(
+            status_code=400,
+            detail="Game is not active"
+        )
+
+    if not game.questions or game.current_question_index + 1 >= len(game.questions):
+        # End the game if no more questions
+        game.status = "completed"
+        game.ended_at = datetime.utcnow()
+    else:
+        game.current_question_index += 1
+        game.starting_word = game.questions[game.current_question_index].question_text
         
-    res["words"] = []
-    for w in game.words:
-        d = w.model_dump()
-        d["id"] = w.int_id
-        res["words"].append(d)
-        
-    return res
+        # Reset the words array for the new question
+        starting_word_entry = GameWord(
+            int_id=1,
+            word=game.starting_word,
+            submitted_by="system",
+            is_valid=True,
+            position=0
+        )
+        game.words = [starting_word_entry]
+
+    await game.save()
+    return format_game_response(game)
 
 
 @game_router.get("/chain-answer/status/groq")

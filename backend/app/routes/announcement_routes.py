@@ -9,7 +9,10 @@ announcement_router = APIRouter(prefix="/announcements", tags=["Announcements"])
 
 @announcement_router.get("/{course_id}", response_model=list[AnnouncementResponse])
 async def get_announcements(course_id: int):
-    announcements = await Announcement.find(Announcement.course_id == course_id).to_list()
+    # Sort by pinned (True first), then by created_at descending
+    announcements = await Announcement.find(Announcement.course_id == course_id).sort(
+        [("pinned", -1), ("created_at", -1)]
+    ).to_list()
     return [
         AnnouncementResponse(**{**a.model_dump(), "id": a.int_id}) for a in announcements
     ]
@@ -39,6 +42,7 @@ async def create_announcement(
         time=final_time,
         pinned=pinned,
         attachment_path=save_optional_upload(file, "announcements"),
+        created_at=datetime.utcnow().isoformat()
     )
     await new_announcement.assign_id()
     await new_announcement.insert()

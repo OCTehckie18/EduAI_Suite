@@ -133,7 +133,7 @@ export const ReportsPage: React.FC = () => {
     }
     try {
       setLoading(true);
-      const res = await fetch(`${API_ENDPOINTS.REPORTS}/${selectedReportId}/send`, { 
+      const res = await fetch(`${API_ENDPOINTS.REPORTS}/${selectedReportId}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: sendEmailAddress })
@@ -228,24 +228,22 @@ export const ReportsPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { type: 'Class Report', title: 'Class-Level Reports', desc: 'Generate aggregated performance stats.', icon: <Users size={20}/>, color: 'blue' },
-          { type: 'Student Report', title: 'Parent-Ready Auto Reports', desc: 'AI summarizes student strengths & weaknesses.', icon: <FileSpreadsheet size={20}/>, color: 'green' },
+          { type: 'Class Report', title: 'Class-Level Reports', desc: 'Generate aggregated performance stats.', icon: <Users size={20} />, color: 'blue' },
+          { type: 'Student Report', title: 'Parent-Ready Auto Reports', desc: 'AI summarizes student strengths & weaknesses.', icon: <FileSpreadsheet size={20} />, color: 'green' },
         ].map((item) => (
           <GlassCard key={item.title} className="p-6 group hover:scale-[1.02] transition-all duration-300">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 ${
-              item.color === 'blue' ? 'bg-[#264796]/10 text-[#264796] group-hover:bg-[#264796] group-hover:text-white' :
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 ${item.color === 'blue' ? 'bg-[#264796]/10 text-[#264796] group-hover:bg-[#264796] group-hover:text-white' :
               'bg-[#d0ae61]/10 text-[#d0ae61] group-hover:bg-[#d0ae61] group-hover:text-white'
-            }`}>
+              }`}>
               {item.icon}
             </div>
             <h3 className="text-lg font-bold mb-2 font-display" style={{ color: "var(--color-text-primary)" }}>{item.title}</h3>
             <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{item.desc}</p>
-            <button 
-              onClick={() => openModal(item.type)} 
-              className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-all duration-300 ${
-                item.color === 'blue' ? 'text-[#264796] hover:text-[#2a52a8]' :
+            <button
+              onClick={() => openModal(item.type)}
+              className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-all duration-300 ${item.color === 'blue' ? 'text-[#264796] hover:text-[#2a52a8]' :
                 'text-[#d0ae61] hover:text-[#ddb867]'
-              }`}
+                }`}
             >
               Generate
               <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
@@ -254,7 +252,7 @@ export const ReportsPage: React.FC = () => {
         ))}
 
         {/* Template Upload Card */}
-        <GlassCard className="p-6 group hover:scale-[1.02] transition-all duration-300 relative overflow-hidden">
+        <GlassCard className="hidden p-6 group hover:scale-[1.02] transition-all duration-300 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full" />
           <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white">
             <Upload size={20} />
@@ -295,19 +293,19 @@ export const ReportsPage: React.FC = () => {
                 <tr key={rep.id} className="hover:bg-black/5 transition-colors">
                   <td className="px-6 py-4 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{rep.id}</td>
                   <td className="px-6 py-4 font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                     <div className="flex items-center gap-2">
-                       {rep.status === 'generating' && <RefreshCw size={14} className="animate-spin text-[#264796]" />}
-                       {rep.status === 'failed' && <span className="text-red-500 text-xs px-1 border border-red-500 rounded">Failed</span>}
-                       {rep.type === 'Template Report' && <span className="text-purple-400 text-[10px] px-1.5 py-0.5 border border-purple-400/40 rounded-md bg-purple-400/5 font-bold uppercase tracking-wider">Template</span>}
-                       {rep.name}
-                     </div>
+                    <div className="flex items-center gap-2">
+                      {rep.status === 'generating' && <RefreshCw size={14} className="animate-spin text-[#264796]" />}
+                      {rep.status === 'failed' && <span className="text-red-500 text-xs px-1 border border-red-500 rounded">Failed</span>}
+                      {rep.type === 'Template Report' && <span className="text-purple-400 text-[10px] px-1.5 py-0.5 border border-purple-400/40 rounded-md bg-purple-400/5 font-bold uppercase tracking-wider">Template</span>}
+                      {rep.name}
+                    </div>
                   </td>
                   <td className="px-6 py-4" style={{ color: "var(--color-text-secondary)" }}>{rep.type}</td>
                   <td className="px-6 py-4" style={{ color: "var(--color-text-secondary)" }}>{rep.date}</td>
                   <td className="px-6 py-4 text-right space-x-3">
-                    <button onClick={() => handleViewClick(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#264796] disabled:opacity-30" title="View Content"><FileSpreadsheet size={16}/></button>
-                    <button onClick={() => handleDownload(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#264796] disabled:opacity-30" title="Download"><Download size={16}/></button>
-                    <button onClick={() => handleSendClick(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#d0ae61] disabled:opacity-30" title="Send"><Send size={16}/></button>
+                    <button onClick={() => handleViewClick(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#264796] disabled:opacity-30" title="View Content"><FileSpreadsheet size={16} /></button>
+                    <button onClick={() => handleDownload(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#264796] disabled:opacity-30" title="Download"><Download size={16} /></button>
+                    <button onClick={() => handleSendClick(rep)} disabled={rep.status !== 'ready'} className="text-gray-500 hover:text-[#d0ae61] disabled:opacity-30" title="Send"><Send size={16} /></button>
                   </td>
                 </tr>
               ))}
@@ -318,7 +316,7 @@ export const ReportsPage: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div 
+          <div
             className="bg-[#121212] rounded-2xl max-w-md w-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10"
             onClick={(e) => e.stopPropagation()}
           >
@@ -328,8 +326,8 @@ export const ReportsPage: React.FC = () => {
                   <h2 className="text-2xl font-bold text-white font-display mb-1">Generate Report</h2>
                   <p className="text-gray-400 text-sm">Configure your automated report parameters.</p>
                 </div>
-                <button 
-                  onClick={() => setIsModalOpen(false)} 
+                <button
+                  onClick={() => setIsModalOpen(false)}
                   className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
                 >
                   <X size={20} />
@@ -340,8 +338,8 @@ export const ReportsPage: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-[#d0ae61] mb-2 ml-1">Report Type</label>
                   <div className="relative group">
-                    <select 
-                      value={newReportType} 
+                    <select
+                      value={newReportType}
                       onChange={(e) => setNewReportType(e.target.value)}
                       className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-[#264796]/50 transition-all cursor-pointer hover:bg-white/10"
                     >
@@ -353,15 +351,15 @@ export const ReportsPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {newReportType !== 'Analytics Export' && (
                   <div className="animate-in slide-in-from-top-2 duration-300">
                     <label className="block text-xs font-bold uppercase tracking-widest text-[#d0ae61] mb-2 ml-1">
                       {newReportType === 'Student Report' ? 'Student' : 'Course Name'}
                     </label>
                     <div className="relative group">
-                      <select 
-                        value={newReportTargetId} 
+                      <select
+                        value={newReportTargetId}
                         onChange={(e) => setNewReportTargetId(Number(e.target.value))}
                         className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-[#264796]/50 transition-all cursor-pointer hover:bg-white/10"
                       >
@@ -397,9 +395,9 @@ export const ReportsPage: React.FC = () => {
                     </p>
                   </div>
                 )}
-                
-                <button 
-                  onClick={() => handleGenerate(newReportType, newReportTargetId)} 
+
+                <button
+                  onClick={() => handleGenerate(newReportType, newReportTargetId)}
                   disabled={loading}
                   className="w-full h-14 bg-[#264796] hover:bg-[#1c3570] disabled:bg-[#1c3570] disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(38,71,150,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(38,71,150,0.6)] group mt-4"
                 >
@@ -421,7 +419,7 @@ export const ReportsPage: React.FC = () => {
 
       {isSendModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div 
+          <div
             className="bg-[#121212] rounded-2xl max-w-md w-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10"
             onClick={(e) => e.stopPropagation()}
           >
@@ -431,8 +429,8 @@ export const ReportsPage: React.FC = () => {
                   <h2 className="text-2xl font-bold text-white font-display mb-1">Send Report</h2>
                   <p className="text-gray-400 text-sm">Email this report directly to recipients.</p>
                 </div>
-                <button 
-                  onClick={() => setIsSendModalOpen(false)} 
+                <button
+                  onClick={() => setIsSendModalOpen(false)}
                   className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
                 >
                   <X size={20} />
@@ -443,9 +441,9 @@ export const ReportsPage: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-[#d0ae61] mb-2 ml-1">Recipient Email</label>
                   <div className="relative group">
-                    <input 
-                      type="email" 
-                      value={sendEmailAddress} 
+                    <input
+                      type="email"
+                      value={sendEmailAddress}
                       onChange={(e) => setSendEmailAddress(e.target.value)}
                       placeholder="parent@school.com"
                       className="w-full h-12 rounded-xl border border-white/10 bg-white/5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#264796]/50 transition-all hover:bg-white/10 placeholder:text-gray-600"
@@ -455,9 +453,9 @@ export const ReportsPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
-                <button 
-                  onClick={confirmSend} 
+
+                <button
+                  onClick={confirmSend}
                   disabled={loading}
                   className="w-full h-14 bg-[#264796] hover:bg-[#1c3570] disabled:bg-[#1c3570] disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(38,71,150,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(38,71,150,0.6)] group mt-4"
                 >
@@ -478,7 +476,7 @@ export const ReportsPage: React.FC = () => {
       )}
       {isViewModalOpen && viewingReport && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-xl z-50 flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
-          <div 
+          <div
             className="bg-[#0f0f0f] rounded-3xl max-w-4xl w-full h-[85vh] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.5)] border border-white/10 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
@@ -488,15 +486,15 @@ export const ReportsPage: React.FC = () => {
                 <p className="text-gray-400 text-xs uppercase tracking-widest">{viewingReport.type} • Generated on {viewingReport.date}</p>
               </div>
               <div className="flex items-center gap-3">
-                <button 
+                <button
                   onClick={() => handleDownload(viewingReport)}
                   className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all border border-white/5"
                   title="Download TXT"
                 >
                   <Download size={18} />
                 </button>
-                <button 
-                  onClick={() => setIsViewModalOpen(false)} 
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
                   className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-red-500/20 text-gray-400 hover:text-red-500 transition-all"
                 >
                   <X size={20} />
@@ -505,27 +503,27 @@ export const ReportsPage: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 md:p-12 text-gray-300 leading-relaxed font-serif text-lg selection:bg-blue-500/30">
-               <div className="max-w-2xl mx-auto space-y-6">
-                 {viewingReport.content?.split('\n').map((line: string, i: number) => {
-                   if (!line.trim()) return <div key={i} className="h-4" />;
-                   
-                   // Handle bold headers/sections
-                   const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
-                   return (
-                     <p key={i} dangerouslySetInnerHTML={{ __html: formattedLine }} />
-                   );
-                 })}
-               </div>
+              <div className="max-w-2xl mx-auto space-y-6">
+                {viewingReport.content?.split('\n').map((line: string, i: number) => {
+                  if (!line.trim()) return <div key={i} className="h-4" />;
+
+                  // Handle bold headers/sections
+                  const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+                  return (
+                    <p key={i} dangerouslySetInnerHTML={{ __html: formattedLine }} />
+                  );
+                })}
+              </div>
             </div>
 
             <div className="p-6 border-t border-white/5 bg-white/5 flex justify-end gap-4">
-              <button 
+              <button
                 onClick={() => setIsViewModalOpen(false)}
                 className="px-6 py-2.5 rounded-xl text-gray-400 hover:text-white font-bold transition-all"
               >
                 Close
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setIsViewModalOpen(false);
                   handleSendClick(viewingReport);
@@ -565,13 +563,12 @@ export const ReportsPage: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2 ml-1">Report Template (PDF)</label>
                   <div
-                    className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${
-                      isDragging
-                        ? 'border-purple-400 bg-purple-400/10'
-                        : templateFile
+                    className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${isDragging
+                      ? 'border-purple-400 bg-purple-400/10'
+                      : templateFile
                         ? 'border-green-500/50 bg-green-500/5'
                         : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
-                    }`}
+                      }`}
                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={handleDrop}

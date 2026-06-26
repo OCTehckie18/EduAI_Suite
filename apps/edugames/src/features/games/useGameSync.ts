@@ -230,16 +230,61 @@ export const useGameSync = ({
               };
             });
           } else if (message.type === "game_started") {
-            setGameState((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    status: "active",
-                    timer: (prev as any).time_per_turn || 30,
-                    currentPlayerIndex: 0,
-                  }
-                : null,
-            );
+            setGameState((prev) => {
+              if (!prev) return null;
+              
+              const updatedFields: any = {
+                status: "active",
+                timer: (prev as any).time_per_turn || 30,
+                currentPlayerIndex: 0,
+              };
+
+              if (message.starting_word) {
+                updatedFields.starting_word = message.starting_word;
+                const startingWordEntry = {
+                  id: 1,
+                  word: message.starting_word,
+                  submitted_by: "system",
+                  submitted_at: new Date().toISOString(),
+                  is_valid: true,
+                  position: 0,
+                  validation_reason: null,
+                };
+                updatedFields.words = [startingWordEntry];
+                updatedFields.chain = [startingWordEntry];
+              }
+
+              if (message.current_question_index !== undefined) {
+                updatedFields.current_question_index = message.current_question_index;
+              }
+
+              return {
+                ...prev,
+                ...updatedFields,
+              };
+            });
+          } else if (message.type === "new_question") {
+            setGameState((prev) => {
+              if (!prev) return null;
+              const startingWordEntry = {
+                id: 1,
+                word: message.starting_word,
+                submitted_by: "system",
+                submitted_at: new Date().toISOString(),
+                is_valid: true,
+                position: 0,
+                validation_reason: null,
+              };
+              return {
+                ...prev,
+                starting_word: message.starting_word,
+                current_question_index: message.current_question_index,
+                words: [startingWordEntry],
+                chain: [startingWordEntry],
+                currentPlayerIndex: 0,
+                timer: (prev as any).time_per_turn || 30,
+              };
+            });
           } else if (message.type === "game_ended") {
             setGameState((prev) =>
               prev ? { ...prev, status: "completed" } : null,
@@ -472,6 +517,22 @@ export const useGameSync = ({
     [connectionMode, isConnected, sendMessage],
   );
 
+  const nextQuestion = useCallback(async () => {
+    if (connectionMode === "ws" && isConnected) {
+      sendMessage({ type: "next_question" });
+      return;
+    }
+    // REST fallback
+    if (gameId > 0) {
+      try {
+        const updatedGame = await gameAPI.nextQuestion(gameId);
+        setGameState(updatedGame);
+      } catch (err) {
+        console.error("Failed to advance question:", err);
+      }
+    }
+  }, [gameId, connectionMode, isConnected, sendMessage]);
+
   return {
     isConnected,
     connectionMode,
@@ -480,6 +541,7 @@ export const useGameSync = ({
     submitWord,
     startGame,
     endGame,
+    nextQuestion,
     skipTurn,
     sendMessage,
   };

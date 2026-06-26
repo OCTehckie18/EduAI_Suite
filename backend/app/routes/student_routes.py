@@ -34,6 +34,13 @@ async def manual_enroll(course_id: int, student: StudentCreate):
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
+    existing_student = await Student.find_one(
+        Student.course_id == course_id,
+        Student.email == student.email
+    )
+    if existing_student:
+        raise HTTPException(status_code=409, detail="Student with this email is already enrolled in this course")
+
     import random
     new_student = Student(
         **student.model_dump(), 
@@ -77,6 +84,9 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
     students_to_add = []
+    existing_students = await Student.find(Student.course_id == course_id).to_list()
+    existing_emails = {s.email.lower() for s in existing_students if s.email}
+    seen_emails_in_file = set()
     
     for line in text_content.split('\n'):
         line = line.strip()
@@ -123,6 +133,11 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
             student_class = csv_match.group(4).replace('"', '').strip()
             dept = csv_match.group(5).replace('"', '').strip()
 
+        if email.lower() in existing_emails or email.lower() in seen_emails_in_file:
+            continue
+            
+        seen_emails_in_file.add(email.lower())
+
         new_student = Student(
             course_id=course_id,
             registration_number=reg_num[:20],
@@ -150,6 +165,13 @@ async def enroll_via_code(enrollment_code: str, student: StudentCreate):
     course = await Course.find_one(Course.enrollment_code == enrollment_code)
     if not course:
         raise HTTPException(status_code=404, detail="Invalid enrollment code")
+
+    existing_student = await Student.find_one(
+        Student.course_id == course.int_id,
+        Student.email == student.email
+    )
+    if existing_student:
+        raise HTTPException(status_code=409, detail="Student with this email is already enrolled in this course")
 
     import random
     new_student = Student(

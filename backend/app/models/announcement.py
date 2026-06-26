@@ -11,6 +11,7 @@ class Announcement(Document):
     time: Optional[str] = None
     pinned: bool = False
     attachment_path: Optional[str] = None
+    created_at: str = ""  # We'll use ISO format string for easy serialization
 
     class Settings:
         name = "announcements"

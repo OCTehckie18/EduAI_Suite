@@ -342,6 +342,8 @@ async def chain_answer_websocket_endpoint(
                 "status": game.status,
                 "starting_word": game.starting_word,
                 "time_per_turn": game.time_per_turn or 30,
+                "questions": [{"id": q.int_id, "question_text": q.question_text, "order": q.order} for q in game.questions],
+                "current_question_index": game.current_question_index,
             },
             "players": players_list,
             "chain": chain,
@@ -452,11 +454,59 @@ async def chain_answer_websocket_endpoint(
                 if game and game.status == "setup":
                     game.status = "active"
                     game.started_at = datetime.utcnow()
+                    if game.questions:
+                        game.current_question_index = 0
+                        game.starting_word = game.questions[0].question_text
+                        starting_word_entry = GameWord(
+                            int_id=1,
+                            word=game.starting_word,
+                            submitted_by="system",
+                            is_valid=True,
+                            position=0
+                        )
+                        game.words = [starting_word_entry]
                     await game.save()
                     await manager.broadcast(session_id, {
                         "type": "game_started",
                         "status": "active",
+                        "starting_word": game.starting_word,
+                        "current_question_index": game.current_question_index,
                     })
+
+            elif msg_type == "next_question":
+                if user_type != "teacher":
+                    await websocket.send_json({"type": "error", "message": "Only teachers can advance questions"})
+                    continue
+
+                game = await ChainAnswerGame.find_one(ChainAnswerGame.session_id == session_id)
+                if game and game.status == "active":
+                    if game.questions and game.current_question_index + 1 < len(game.questions):
+                        game.current_question_index += 1
+                        game.starting_word = game.questions[game.current_question_index].question_text
+                        
+                        starting_word_entry = GameWord(
+                            int_id=1,
+                            word=game.starting_word,
+                            submitted_by="system",
+                            is_valid=True,
+                            position=0
+                        )
+                        game.words = [starting_word_entry]
+                        await game.save()
+                        
+                        await manager.broadcast(session_id, {
+                            "type": "new_question",
+                            "current_question_index": game.current_question_index,
+                            "starting_word": game.starting_word,
+                        })
+                    else:
+                        game.status = "completed"
+                        game.ended_at = datetime.utcnow()
+                        await game.save()
+                        await manager.broadcast(session_id, {
+                            "type": "game_ended",
+                            "status": "completed",
+                        })
 
             elif msg_type in ("end_game", "game_ended"):
                 game = await ChainAnswerGame.find_one(ChainAnswerGame.session_id == session_id)
@@ -520,7 +570,7 @@ async def slido_websocket_endpoint(
             message = json.loads(data)
             message_type = message.get("type")
 
-            if message_type == "poll_launched" and user_type == "teacher":
+            if message_type == "poll_launched" and user_type in ("teacher", "presenter"):
                 poll_id = message.get("poll_id")
                 poll = await SlidoPoll.find_one(SlidoPoll.int_id == poll_id)
                 if poll:
@@ -540,7 +590,7 @@ async def slido_websocket_endpoint(
                     session.updated_at = datetime.utcnow()
                     await session.save()
 
-            elif message_type == "poll_closed" and user_type == "teacher":
+            elif message_type == "poll_closed" and user_type in ("teacher", "presenter"):
                 poll_id = message.get("poll_id")
                 poll = await SlidoPoll.find_one(SlidoPoll.int_id == poll_id)
                 if poll:
@@ -568,7 +618,7 @@ async def slido_websocket_endpoint(
                         "total_responses": poll.total_responses
                     })
 
-            elif message_type == "presentation_state_changed" and user_type == "teacher":
+            elif message_type == "presentation_state_changed" and user_type in ("teacher", "presenter"):
                 active_view = message.get("active_view")
                 current_slide = message.get("current_slide")
                 session = await SlidoSession.find_one(SlidoSession.pin == pin)
@@ -587,7 +637,7 @@ async def slido_websocket_endpoint(
                     "current_slide": session.current_slide
                 })
 
-            elif message_type == "qna_answered" and user_type == "teacher":
+            elif message_type == "qna_answered" and user_type in ("teacher", "presenter"):
                 question_id = message.get("question_id")
                 answer_text = message.get("answer_text")
                 question = await SlidoQnA.find_one(SlidoQnA.int_id == question_id)

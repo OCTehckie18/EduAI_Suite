@@ -19,6 +19,7 @@ export interface ChainAnswerGameConfig {
   penalty_on_invalid: boolean;
   penalty_type?: string;
   players: GamePlayer[];
+  questions?: { question_text: string }[];
 }
 
 export interface GameResponse {
@@ -38,6 +39,8 @@ export interface GameResponse {
   currentPlayerIndex?: number;
   timer?: number;
   errorMessage?: string;
+  questions?: { id: number; question_text: string; order: number }[];
+  current_question_index?: number;
 }
 
 // OllamaStatus removed — GROQ is the sole LLM provider now
@@ -342,6 +345,32 @@ class ChainAnswerGameAPI {
       return await response.json();
     } catch (error) {
       console.error("Error resuming game:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Advance to the next question
+   */
+  async nextQuestion(gameId: number): Promise<GameResponse> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/chain-answer/${gameId}/next-question`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to advance to next question: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error advancing next question:", error);
       throw error;
     }
   }

@@ -10,7 +10,8 @@ const studentNavItems = [
   { icon: BookOpen, label: "My Classrooms", href: "/classroom" },
   { icon: Clock, label: "Upcoming Exams", href: "/exams" },
   { icon: Gamepad2, label: "EduGames", href: "/games" },
-  { icon: Calendar, label: "Appointments", href: "/appointments" },
+  { icon: Calendar, label: "My Calendar", href: "/calendar" },
+  { icon: Clock, label: "Appointments", href: "/appointments" }, // Clock or Calendar? It uses Calendar but we used it for My Calendar
 ];
 
 export const StudentShell: React.FC = () => {

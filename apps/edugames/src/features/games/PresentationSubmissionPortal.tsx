@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import InteractionStudio from "./InteractionStudio";
 import PresenterView from "./PresenterView";
+import { API_BASE_URL } from "../../shared/utils/gameAPI";
 
 interface Assignment {
   id: number;
@@ -72,7 +73,7 @@ const PresentationSubmissionPortal: React.FC = () => {
     const fetchAssignmentAndSubmission = async () => {
       try {
         // Fetch assignments
-        const assignmentsRes = await fetch("/api/slido/assignments");
+        const assignmentsRes = await fetch(`${API_BASE_URL}/slido/assignments`);
         if (assignmentsRes.ok) {
           const assignmentsData = await assignmentsRes.json();
           setAssignments(assignmentsData);
@@ -82,7 +83,7 @@ const PresentationSubmissionPortal: React.FC = () => {
             setAssignment(currentAssignment);
 
             // Fetch existing submission for this assignment and student
-            const submissionsRes = await fetch(`/api/slido/submissions?assignment_id=${currentAssignment.id}&student_id=${studentId}`);
+            const submissionsRes = await fetch(`${API_BASE_URL}/slido/submissions?assignment_id=${currentAssignment.id}&student_id=${studentId}`);
             if (submissionsRes.ok) {
               const submissionsData = await submissionsRes.json();
               if (submissionsData.length > 0) {
@@ -167,7 +168,7 @@ const PresentationSubmissionPortal: React.FC = () => {
       formData.append("student_id", studentId);
       formData.append("file", file);
 
-      const response = await fetch("/api/slido/submissions/upload", {
+      const response = await fetch(`${API_BASE_URL}/slido/submissions/upload`, {
         method: "POST",
         body: formData,
       });
@@ -221,7 +222,7 @@ const PresentationSubmissionPortal: React.FC = () => {
         onFinalize={() => {
           setStudioMode(false);
           // Refresh submission to get updated status
-          fetch(`/api/slido/submissions/${submission.id}`)
+          fetch(`${API_BASE_URL}/slido/submissions/${submission.id}`)
             .then((r) => r.json())
             .then((data) => setSubmission(data))
             .catch(console.error);
@@ -261,7 +262,7 @@ const PresentationSubmissionPortal: React.FC = () => {
                 setAssignment(selected || null);
                 setSubmission(null);
                 if (selected) {
-                  fetch(`/api/slido/submissions?assignment_id=${selected.id}&student_id=${studentId}`)
+                  fetch(`${API_BASE_URL}/slido/submissions?assignment_id=${selected.id}&student_id=${studentId}`)
                     .then(res => res.json())
                     .then(data => {
                       if (data.length > 0) setSubmission(data[0]);

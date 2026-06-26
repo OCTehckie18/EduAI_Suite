@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Hash, ArrowRight, Loader2, AlertCircle, Users, Zap, Radio } from "lucide-react";
 import LiveSessionInterface from "./LiveSessionInterface";
+import { API_BASE_URL } from "../../shared/utils/gameAPI";
 
 const BRAND_BLUE = "#264796";
 const BRAND_BLUE_LIGHT = "#3460c4";
@@ -27,7 +28,7 @@ const AudienceJoinHub: React.FC = () => {
     setError(null);
 
     try {
-      const res = await fetch(`/api/slido/sessions/pin/${cleanPin}`);
+      const res = await fetch(`${API_BASE_URL}/slido/sessions/pin/${cleanPin}`);
       if (!res.ok) {
         throw new Error("Session not found. Please check the PIN and try again.");
       }

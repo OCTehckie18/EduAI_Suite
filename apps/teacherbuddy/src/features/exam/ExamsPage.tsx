@@ -67,6 +67,9 @@ export const ExamsPage: React.FC = () => {
         headers: { "Authorization": `Bearer ${token}` },
         signal: AbortSignal.timeout(10000) // 10 second timeout
       });
+      if (response.status === 401) {
+        throw new Error("Session expired. Please log out and log back in.");
+      }
       if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
       const data = await response.json();
       setExamsList(data);
@@ -75,7 +78,7 @@ export const ExamsPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Error fetching exams:", err);
-      setError(err.name === 'TimeoutError' ? "Request timed out. Is the backend running?" : "Failed to load exams. Please refresh.");
+      setError(err.message === "Session expired. Please log out and log back in." ? err.message : (err.name === 'TimeoutError' ? "Request timed out. Is the backend running?" : "Failed to load exams. Please refresh."));
     } finally {
       setLoading(false);
     }

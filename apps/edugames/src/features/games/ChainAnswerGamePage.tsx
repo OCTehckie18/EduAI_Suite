@@ -16,7 +16,6 @@ export const ChainAnswerGamePage: React.FC = () => {
     const { sessionId: urlSessionId } = useParams<{ sessionId?: string }>();
     const { role } = useAuthStore();
     const [gameStarted, setGameStarted] = useState(false);
-    const [gameEndedScreen, setGameEndedScreen] = useState(false);
     const storedPlayerSession = loadChainAnswerPlayerSession();
     const [joinedGameId, setJoinedGameId] = useState<number | null>(
       storedPlayerSession?.gameId ?? null,
@@ -51,6 +50,8 @@ export const ChainAnswerGamePage: React.FC = () => {
       startingWord: "Apple",
     });
 
+    const [questions, setQuestions] = useState<string[]>([""]);
+
     // No longer using local useChainGameState — teacher uses WebSocket sync via ChainGameBoard
 
     const handleTogglePlayer = (studentId: number) => {
@@ -72,6 +73,11 @@ export const ChainAnswerGamePage: React.FC = () => {
         .filter((s) => selectedPlayerIds.has(s.id))
         .map((s) => ({ student_id: s.id }));
 
+      const formattedQuestions = questions
+        .map((q) => q.trim())
+        .filter((q) => q.length > 0)
+        .map((q) => ({ question_text: q }));
+
       try {
         const game = await gameAPI.createGame({
           name: gameConfig.name,
@@ -79,10 +85,11 @@ export const ChainAnswerGamePage: React.FC = () => {
           category: gameConfig.category,
           difficulty_level: gameConfig.difficulty,
           language: gameConfig.language,
-          starting_word: gameConfig.startingWord,
+          starting_word: formattedQuestions[0]?.question_text || gameConfig.startingWord,
           time_per_turn: 30,
           penalty_on_invalid: false,
           players: selectedPlayers,
+          questions: formattedQuestions,
         });
 
         setJoinedGameId(game.id);
@@ -134,9 +141,7 @@ export const ChainAnswerGamePage: React.FC = () => {
             localStorage.removeItem("chain_answer_player_session");
           }}
           onGameEnded={() => {
-            // Game ended by teacher, show ended screen
-            setGameEndedScreen(true);
-            localStorage.removeItem("chain_answer_player_session");
+            // Allow ChainGameBoard to show its own final standings screen
           }}
           onExit={() => {
             setJoinedSessionId(null);
@@ -148,35 +153,7 @@ export const ChainAnswerGamePage: React.FC = () => {
         />
       );
     }
-
-    if (gameEndedScreen) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-          <GlassCard className="w-full max-w-md p-8 text-center space-y-6">
-            <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <Check size={32} className="text-blue-600" />
-            </div>
-            <h1 className="text-4xl font-bold font-display text-blue-600 mb-4">Game Ended!</h1>
-            <p className="text-gray-600">The teacher has concluded this Chain Answer game. Great job participating!</p>
-            <button
-              onClick={() => {
-                setGameEndedScreen(false);
-                setJoinedSessionId(null);
-                setJoinedGameId(null);
-                setJoinedPlayerId(null);
-                setJoinedPlayerName(null);
-                setGameStarted(false);
-              }}
-              className="w-full py-4 rounded-xl font-bold text-white text-lg transition-transform hover:scale-105 active:scale-95"
-              style={{ background: "var(--color-brand-blue)" }}
-            >
-              Back to Home
-            </button>
-          </GlassCard>
-        </div>
-      );
-    }
-
+    // Removed gameEndedScreen static view to use the board's rich final standings screen
     // If student without a stable player identity, show join form
     if (role === "student") {
       return (
@@ -300,8 +277,7 @@ export const ChainAnswerGamePage: React.FC = () => {
           userType="teacher"
           onError={(err) => console.error("Game sync error:", err)}
           onGameEnded={() => {
-            setGameEndedScreen(true);
-            setGameStarted(false);
+            // Allow ChainGameBoard to show its own final standings screen
           }}
           onExit={() => {
             setGameStarted(false);
@@ -498,13 +474,14 @@ export const ChainAnswerGamePage: React.FC = () => {
                   <input
                     type="text"
                     value={gameConfig.startingWord}
+                    disabled={questions.filter(q => q.trim().length > 0).length > 0}
                     onChange={(e) =>
                       setGameConfig({
                         ...gameConfig,
                         startingWord: e.target.value,
                       })
                     }
-                    className="w-full px-4 py-2 rounded-lg border-2 focus:outline-none"
+                    className="w-full px-4 py-2 rounded-lg border-2 focus:outline-none disabled:opacity-50"
                     style={{
                       borderColor: "var(--color-border)",
                       background: "var(--color-bg-secondary)",
@@ -512,6 +489,67 @@ export const ChainAnswerGamePage: React.FC = () => {
                     }}
                   />
                 </div>
+              </div>
+
+              {/* Multiple Questions/Prompts Section */}
+              <div className="mt-6 border-t pt-6" style={{ borderColor: "var(--color-border)" }}>
+                <h3
+                  className="text-lg font-bold mb-2"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Game Questions / Prompts (Optional)
+                </h3>
+                <p className="text-xs mb-4" style={{ color: "var(--color-text-secondary)" }}>
+                  If you add prompts here, students will play multiple questions sequentially. If left empty, the game will play a single question using the "Starting Word" above.
+                </p>
+                
+                <div className="space-y-3">
+                  {questions.map((q, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <span className="text-sm font-bold text-slate-500 w-6">#{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={q}
+                        onChange={(e) => {
+                          const updated = [...questions];
+                          updated[idx] = e.target.value;
+                          setQuestions(updated);
+                        }}
+                        placeholder={`e.g. Prompt #${idx + 1}`}
+                        className="flex-1 px-4 py-2 rounded-lg border-2 focus:outline-none"
+                        style={{
+                          borderColor: "var(--color-border)",
+                          background: "var(--color-bg-secondary)",
+                          color: "var(--color-text-primary)",
+                        }}
+                      />
+                      {questions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuestions(questions.filter((_, i) => i !== idx));
+                          }}
+                          className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setQuestions([...questions, ""])}
+                  className="mt-3 px-4 py-2 rounded-lg font-semibold text-xs border transition-colors hover:bg-blue-50"
+                  style={{
+                    borderColor: "var(--color-brand-blue)",
+                    color: "var(--color-brand-blue)",
+                    background: "transparent",
+                  }}
+                >
+                  + Add Prompt
+                </button>
               </div>
             </GlassCard>
           </div>
