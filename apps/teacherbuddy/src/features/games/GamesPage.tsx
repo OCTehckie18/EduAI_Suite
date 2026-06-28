@@ -51,14 +51,14 @@ const gameCategories = [
   //   icon: Users,
   //   color: "from-pink-400 to-rose-500",
   // },
-  {
-    id: "slido-polling",
-    title: "Slido — Live Polling & Q&A",
-    description:
-      "Live polling and Q&A integrated into presentations. Engage students in real-time feedback.",
-    icon: BarChart,
-    color: "from-purple-400 to-violet-500",
-  },
+  // {
+  //   id: "slido-polling",
+  //   title: "Slido — Live Polling & Q&A",
+  //   description:
+  //     "Live polling and Q&A integrated into presentations. Engage students in real-time feedback.",
+  //   icon: BarChart,
+  //   color: "from-purple-400 to-violet-500",
+  // },
   // {
   //   id: "padlet-board",
   //   title: "Padlet — Shared Visual Board",

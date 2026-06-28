@@ -67,6 +67,7 @@ async def init_db():
         QnAUpvote,
         SubmissionInteraction,
     )
+    from app.models.resource import Resource
     from app.models.trello import TrelloBoard, TrelloColumn, TrelloCard
     from app.models.calendar import CalendarEvent
 
@@ -83,7 +84,7 @@ async def init_db():
             SlidoSession, SlidoPoll, PollResponse, SlidoQnA,
             QnAUpvote, SubmissionInteraction,
             TrelloBoard, TrelloColumn, TrelloCard,
-            CalendarEvent,
+            CalendarEvent, Resource,
         ],
     )
     logger.info(f"✅ MongoDB connected: {MONGODB_URL}/{DB_NAME}")

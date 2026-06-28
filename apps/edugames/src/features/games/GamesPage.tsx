@@ -44,22 +44,22 @@ const gameCategories = [
   //   icon: Users,
   //   color: "from-pink-400 to-rose-500",
   // },
-  {
-    id: "slido-polling",
-    title: "Slido — Live Polling & Q&A",
-    description:
-      "Live polling and Q&A integrated into presentations. Engage students in real-time feedback.",
-    icon: BarChart,
-    color: "from-purple-400 to-violet-500",
-  },
-  {
-    id: "slido-join",
-    title: "Join Live Session",
-    description:
-      "Enter a 6-digit PIN to join a classmate's live presentation. Vote on polls and ask questions in real-time.",
-    icon: Users,
-    color: "from-sky-400 to-blue-500",
-  },
+  // {
+  //   id: "slido-polling",
+  //   title: "Slido — Live Polling & Q&A",
+  //   description:
+  //     "Live polling and Q&A integrated into presentations. Engage students in real-time feedback.",
+  //   icon: BarChart,
+  //   color: "from-purple-400 to-violet-500",
+  // },
+  // {
+  //   id: "slido-join",
+  //   title: "Join Live Session",
+  //   description:
+  //     "Enter a 6-digit PIN to join a classmate's live presentation. Vote on polls and ask questions in real-time.",
+  //   icon: Users,
+  //   color: "from-sky-400 to-blue-500",
+  // },
   {
     id: "trello-projects",
     title: "Trello — Project Management",

@@ -32,6 +32,8 @@ import {
   Timer,
   Sparkles,
   ShieldAlert,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
@@ -91,6 +93,7 @@ export const ClassroomsPage: React.FC = () => {
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(
@@ -347,8 +350,7 @@ export const ClassroomsPage: React.FC = () => {
     } catch (err: any) {
       console.error("API call failed:", err);
       setErrorMsg(
-        "Database Error: Is your database schema corrupted or outdated? Please completely restart your terminal with 'uvicorn app.main:app' and delete edu.db! Detail: " +
-          err.message,
+        "Something went wrong: " + err.message,
       );
     }
   };
@@ -781,11 +783,26 @@ export const ClassroomsPage: React.FC = () => {
                       Assignment
                     </button>
                     <button
-                      onClick={() => setShowStudentModal(true)}
-                      className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md font-semibold shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1"
+                      onClick={() => {
+                        const code = selected.enrollment_code || "N/A";
+                        navigator.clipboard.writeText(code).then(() => {
+                          setCodeCopied(true);
+                          setTimeout(() => setCodeCopied(false), 2000);
+                        });
+                      }}
+                      className="btn bg-white/10 border border-white/20 text-white hover:bg-white/20 backdrop-blur-md font-semibold shadow-xl px-5 py-2.5 rounded-xl transition-all hover:-translate-y-1 flex items-center gap-2"
                     >
-                      <UserPlus size={18} className="mr-2 inline" /> Add
-                      Students
+                      {codeCopied ? (
+                        <>
+                          <Check size={18} className="inline" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={18} className="inline" />
+                          Code: {selected.enrollment_code || "N/A"}
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
