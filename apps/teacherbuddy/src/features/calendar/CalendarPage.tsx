@@ -105,7 +105,8 @@ export const CalendarPage: React.FC = () => {
       if (storedUser) {
         try {
           const user = JSON.parse(storedUser);
-          if (user.name) query = `?teacher_name=${encodeURIComponent(user.name)}`;
+          // Omit strict teacher_name filter to ensure all assigned events show on the unified calendar
+          // if (user.name) query = `?teacher_name=${encodeURIComponent(user.name)}`;
         } catch (e) {}
       }
 

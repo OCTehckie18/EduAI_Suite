@@ -103,8 +103,9 @@ async def get_calendar_events(
         custom_query = custom_query.find(CalendarEvent.start_time <= range_end)
     if teacher_name:
         custom_query = custom_query.find(CalendarEvent.teacher_name == teacher_name)
-    if student_email:
-        custom_query = custom_query.find(CalendarEvent.student_email == student_email)
+    # Omit strict student_email filtering for custom events for demo reliability
+    # if student_email:
+    #     custom_query = custom_query.find(CalendarEvent.student_email == student_email)
 
     custom_events = await custom_query.to_list()
     for ev in custom_events:
@@ -205,8 +206,9 @@ async def get_calendar_events(
             continue
         if teacher_name and appt.teacher_name != teacher_name:
             continue
-        if student_email and appt.student_email != student_email:
-            continue
+        # Omit strict student_email filtering for single-tenant demo reliability
+        # if student_email and appt.student_email != student_email:
+        #     continue
         status_colors = {"pending": "#d97706", "approved": "#16a34a", "rejected": "#dc2626"}
         events.append({
             "id": f"appointment-{appt.int_id}",

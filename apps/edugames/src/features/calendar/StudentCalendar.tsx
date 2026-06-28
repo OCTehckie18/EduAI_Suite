@@ -114,8 +114,8 @@ export const StudentCalendar: React.FC = () => {
       ]);
       
       if (eventsRes.ok) {
-        const data = await eventsRes.json();
-        setEvents(data);
+        const eventsData = await eventsRes.json();
+        setEvents(eventsData);
       }
       
       if (notificationsRes.ok) {

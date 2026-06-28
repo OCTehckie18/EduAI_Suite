@@ -161,11 +161,11 @@ export const TrelloBoardsPage: React.FC = () => {
 
 /* ─── Board Tile Sub-Component ────────────────────────────── */
 interface BoardTileProps {
-  board: { 
-    id: string; 
-    name: string; 
-    background: string; 
-    starred: boolean; 
+  board: {
+    id: string;
+    name: string;
+    background: string;
+    starred: boolean;
     createdAt: string;
     joinRequests?: string[];
     creatorEmail: string;
@@ -220,12 +220,12 @@ const BoardTile: React.FC<BoardTileProps> = ({ board, onOpen, onStar, onDelete, 
                     onClick={(e) => e.stopPropagation()}
                     style={{ borderRadius: 10 }}
                   >
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                    className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2 transition-colors"
-                  >
-                    <Trash2 size={14} /> Delete Board
-                  </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                      className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Trash2 size={14} /> Delete Board
+                    </button>
                   </div>
                 </>
               )}

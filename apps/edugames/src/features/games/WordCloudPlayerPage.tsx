@@ -192,7 +192,7 @@ export const WordCloudPlayerPage: React.FC = () => {
           >
             Submit <Send size={24} />
           </button>
-          
+
           <AnimatePresence>
             {showSuccess && (
               <motion.div
@@ -209,9 +209,9 @@ export const WordCloudPlayerPage: React.FC = () => {
             )}
           </AnimatePresence>
         </form>
-        
+
         <p className="text-center text-white/70 mt-6 text-sm">
-           You can submit multiple times!
+          You can submit multiple times!
         </p>
       </GlassCard>
     </div>

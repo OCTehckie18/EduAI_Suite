@@ -502,7 +502,7 @@ export const ChainAnswerGamePage: React.FC = () => {
                 <p className="text-xs mb-4" style={{ color: "var(--color-text-secondary)" }}>
                   If you add prompts here, students will play multiple questions sequentially. If left empty, the game will play a single question using the "Starting Word" above.
                 </p>
-                
+
                 <div className="space-y-3">
                   {questions.map((q, idx) => (
                     <div key={idx} className="flex gap-2 items-center">

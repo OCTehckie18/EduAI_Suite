@@ -292,11 +292,10 @@ const PresentationSubmissionPortal: React.FC = () => {
             {/* Deadline Info */}
             {assignment.deadline && (
               <div
-                className={`mt-4 flex items-center gap-2 p-3 rounded-lg ${
-                  isOverdue
+                className={`mt-4 flex items-center gap-2 p-3 rounded-lg ${isOverdue
                     ? "bg-red-50 text-red-700"
                     : "bg-blue-50 text-blue-700"
-                }`}
+                  }`}
               >
                 <Clock className="w-5 h-5" />
                 {isOverdue ? (
@@ -397,11 +396,10 @@ const PresentationSubmissionPortal: React.FC = () => {
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
                 onClick={handleClick}
-                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition ${
-                  dragActive
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition ${dragActive
                     ? "border-blue-500 bg-blue-50"
                     : "border-slate-300 hover:border-blue-400 hover:bg-slate-50"
-                } ${uploading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${uploading ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <input
                   ref={fileInputRef}

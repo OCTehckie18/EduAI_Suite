@@ -78,8 +78,8 @@ const LiveSessionInterface: React.FC<Props> = ({
     propsStudentId ||
     parseInt(
       searchParams.get("studentId") ||
-        localStorage.getItem("student_id") ||
-        "1",
+      localStorage.getItem("student_id") ||
+      "1",
     );
   const isPresenter =
     propsIsPresenter || searchParams.get("isPresenter") === "true" || false;
@@ -144,15 +144,15 @@ const LiveSessionInterface: React.FC<Props> = ({
 
   const connectWebSocket = () => {
     const userType = isPresenter ? "presenter" : "student";
-    
+
     const cleanUrl = API_BASE_URL.trim();
     let wsUrl = "";
     const path = `/ws/slido/${sessionPin}?user_type=${userType}&user_id=${studentId}`;
     if (cleanUrl.startsWith("/")) {
       const loc = window.location;
       const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
-      const wsHost = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") 
-        ? `${loc.hostname}:8000` 
+      const wsHost = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1")
+        ? `${loc.hostname}:8000`
         : loc.host;
       const pathPrefix = (loc.hostname === "localhost" || loc.hostname === "127.0.0.1") ? "" : cleanUrl;
       wsUrl = `${protocol}//${wsHost}${pathPrefix}${path}`;
@@ -203,10 +203,10 @@ const LiveSessionInterface: React.FC<Props> = ({
         setSessionState((prev) =>
           prev
             ? {
-                ...prev,
-                active_view: message.active_view,
-                current_slide: message.current_slide,
-              }
+              ...prev,
+              active_view: message.active_view,
+              current_slide: message.current_slide,
+            }
             : null,
         );
         break;
@@ -400,11 +400,10 @@ const LiveSessionInterface: React.FC<Props> = ({
                       key={i}
                       onClick={() => submitPollVote(opt)}
                       disabled={hasVoted}
-                      className={`w-full p-2 rounded transition text-left ${
-                        hasVoted
+                      className={`w-full p-2 rounded transition text-left ${hasVoted
                           ? "bg-slate-700 cursor-not-allowed"
                           : "bg-blue-600 hover:bg-blue-700"
-                      }`}
+                        }`}
                     >
                       {opt}
                     </button>
@@ -417,11 +416,10 @@ const LiveSessionInterface: React.FC<Props> = ({
                       key={rating}
                       onClick={() => submitPollVote(rating.toString())}
                       disabled={hasVoted}
-                      className={`flex-1 p-2 rounded transition font-medium ${
-                        hasVoted
+                      className={`flex-1 p-2 rounded transition font-medium ${hasVoted
                           ? "bg-slate-700"
                           : "bg-blue-600 hover:bg-blue-700"
-                      }`}
+                        }`}
                     >
                       {rating}
                     </button>
@@ -468,11 +466,10 @@ const LiveSessionInterface: React.FC<Props> = ({
                   <button
                     onClick={() => upvoteQuestion(q.id)}
                     disabled={upvotedQuestions.has(q.id)}
-                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition ${
-                      upvotedQuestions.has(q.id)
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition ${upvotedQuestions.has(q.id)
                         ? "bg-blue-600 text-white"
                         : "bg-slate-600 hover:bg-slate-500"
-                    }`}
+                      }`}
                   >
                     <ThumbsUp className="w-3 h-3" />
                     {q.upvotes}
