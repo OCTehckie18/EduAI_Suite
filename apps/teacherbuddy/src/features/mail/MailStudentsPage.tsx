@@ -104,6 +104,16 @@ export const MailStudentsPage: React.FC = () => {
   const [showDraftSelectionPopup, setShowDraftSelectionPopup] = useState(false);
   const [draftsToSend, setDraftsToSend] = useState<number[]>([]);
 
+  // Preview state
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  // Temporary Data state
+  const [dataSource, setDataSource] = useState<"platform" | "upload">("platform");
+  const [uploadedData, setUploadedData] = useState<Student[]>([]);
+
   useEffect(() => {
     fetchCourses();
     fetchDrafts();
@@ -140,11 +150,45 @@ export const MailStudentsPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    setPendingFile(file);
     const formData = new FormData();
     formData.append("file", file);
     
     setLoading(true);
     setStatus(null);
+    try {
+        const res = await fetch(`${API_ENDPOINTS.MAIL}/preview_upload`, {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+            setPreviewData(data.preview);
+            setTotalRecords(data.total_records);
+            setShowPreviewModal(true);
+        } else {
+            setStatus({ type: 'error', message: data.detail || "Failed to parse file for preview" });
+            setPendingFile(null);
+        }
+    } catch (err) {
+        setStatus({ type: 'error', message: "Error reading file" });
+        setPendingFile(null);
+    } finally {
+        setLoading(false);
+        if (e.target) e.target.value = '';
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!pendingFile) return;
+    
+    const formData = new FormData();
+    formData.append("file", pendingFile);
+    
+    setLoading(true);
+    setStatus(null);
+    setShowPreviewModal(false);
+    
     try {
         const res = await fetch(`${API_ENDPOINTS.MAIL}/upload_students`, {
             method: "POST",
@@ -152,11 +196,12 @@ export const MailStudentsPage: React.FC = () => {
         });
         const data = await res.json();
         if (res.ok) {
-            setStatus({ type: 'success', message: "Students uploaded successfully. You can now query the new data." });
+            setStatus({ type: 'success', message: "Students imported temporarily for this session." });
+            setUploadedData(data.data);
+            setDataSource("upload");
             setStudents([]); 
             setSelectedStudents([]);
-            fetchCourses();
-            setUploadedFileName(file.name);
+            setUploadedFileName(pendingFile.name);
         } else {
             setStatus({ type: 'error', message: data.detail || "Failed to upload students" });
         }
@@ -164,7 +209,7 @@ export const MailStudentsPage: React.FC = () => {
         setStatus({ type: 'error', message: "Error uploading file" });
     } finally {
         setLoading(false);
-        if (e.target) e.target.value = '';
+        setPendingFile(null);
     }
   };
 
@@ -191,24 +236,47 @@ export const MailStudentsPage: React.FC = () => {
     setLoading(true);
     setStatus(null);
     try {
-      const apiConditions = conditions.map(c => ({
-        field: c.field,
-        operator: c.operator,
-        value: c.field === 'course_id' || c.field === 'attendance' || c.field === 'avg_score' 
-          ? (typeof c.value === 'string' ? parseInt(c.value) : c.value)
-          : c.value
-      }));
+      if (dataSource === "upload") {
+        const result = uploadedData.filter(s => {
+            for (const cond of conditions) {
+                let val: any = (s as any)[cond.field];
+                let cmp: any = cond.value;
+                if (cond.field === 'attendance' || cond.field === 'avg_score') {
+                    cmp = typeof cmp === 'string' ? parseFloat(cmp) : cmp;
+                }
+                
+                if (cond.operator === '==') { if (val != cmp) return false; }
+                else if (cond.operator === '!=') { if (val == cmp) return false; }
+                else if (cond.operator === '>') { if (val <= cmp) return false; }
+                else if (cond.operator === '<') { if (val >= cmp) return false; }
+                else if (cond.operator === '>=') { if (val < cmp) return false; }
+                else if (cond.operator === '<=') { if (val > cmp) return false; }
+                else if (cond.operator === 'contains') { 
+                    if (!String(val).toLowerCase().includes(String(cmp).toLowerCase())) return false; 
+                }
+            }
+            return true;
+        });
+        setStudents(result);
+        setSelectedStudents(result.map(s => s.id));
+      } else {
+        const apiConditions = conditions.map(c => ({
+          field: c.field,
+          operator: c.operator,
+          value: c.field === 'course_id' || c.field === 'attendance' || c.field === 'avg_score' 
+            ? (typeof c.value === 'string' ? parseInt(c.value) : c.value)
+            : c.value
+        }));
 
-      const res = await fetch(`${API_ENDPOINTS.MAIL}/filter`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conditions: apiConditions })
-      });
-      const data = await res.json();
-      setStudents(data);
-      // Only set selectedStudents if we aren't loading a draft that already specifies them
-      // This is a basic approach. The best is just to let the user select.
-      setSelectedStudents(data.map((s: Student) => s.id));
+        const res = await fetch(`${API_ENDPOINTS.MAIL}/filter`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conditions: apiConditions })
+        });
+        const data = await res.json();
+        setStudents(data);
+        setSelectedStudents(data.map((s: Student) => s.id));
+      }
     } catch (err) {
         setStatus({ type: 'error', message: "Failed to filter students" });
     } finally {
@@ -292,9 +360,13 @@ export const MailStudentsPage: React.FC = () => {
     setShowDraftSelectionPopup(false);
     setSending(true);
     try {
-      const payload: any = {
-          student_ids: selectedStudents
-      };
+      const payload: any = {};
+      
+      if (dataSource === 'upload') {
+          payload.temporary_students = students.filter(s => selectedStudents.includes(s.id));
+      } else {
+          payload.student_ids = selectedStudents;
+      }
       
       if (draftsToSend.length > 0) {
           payload.draft_ids = draftsToSend;
@@ -380,14 +452,51 @@ export const MailStudentsPage: React.FC = () => {
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>Communicate with students based on SQL-like performance queries.</p>
         </div>
         <div className="flex items-center gap-4">
+            <div className="flex bg-white/50 backdrop-blur-sm rounded-xl p-1 border shadow-sm" style={{ borderColor: "var(--color-border)" }}>
+              <button
+                onClick={() => { setDataSource("platform"); setStudents([]); setSelectedStudents([]); }}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  dataSource === "platform" 
+                    ? "bg-brand-blue text-white shadow-md" 
+                    : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                Platform
+              </button>
+              <button
+                onClick={() => { 
+                    if (uploadedData.length === 0) {
+                        setStatus({ type: 'error', message: "Please upload data first." });
+                        return;
+                    }
+                    setDataSource("upload"); 
+                    setStudents([]); 
+                    setSelectedStudents([]);
+                }}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  dataSource === "upload" 
+                    ? "bg-green-600 text-white shadow-md" 
+                    : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                Uploads
+              </button>
+            </div>
+            
             {uploadedFileName ? (
                 <div className="flex items-center gap-2 px-4 py-2 rounded-xl border bg-green-50 text-green-700 relative overflow-hidden transition-colors" style={{ borderColor: "var(--color-border)" }}>
                     <FileSpreadsheet size={18} className="text-green-600" />
                     <span className="text-xs font-bold truncate max-w-[150px]">{uploadedFileName}</span>
                     <button 
-                        onClick={() => setUploadedFileName(null)}
+                        onClick={() => {
+                            setUploadedFileName(null);
+                            setUploadedData([]);
+                            setDataSource("platform");
+                            setStudents([]);
+                            setSelectedStudents([]);
+                        }}
                         className="p-1 hover:bg-green-200 rounded-full transition-colors ml-1 text-green-800"
-                        title="Remove file and show upload button"
+                        title="Remove file and switch back to Platform data"
                     >
                         <X size={14} />
                     </button>
@@ -797,6 +906,65 @@ export const MailStudentsPage: React.FC = () => {
       </div>
 
       {/* Popups */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-4xl shadow-2xl flex flex-col animate-fade-in border border-gray-100 max-h-[85vh]">
+             <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+                <h3 className="text-xl font-bold flex items-center gap-2"><Database size={22} className="text-brand-blue"/> Dataset Preview</h3>
+                <button onClick={() => { setShowPreviewModal(false); setPendingFile(null); }} className="p-1.5 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"><X size={18}/></button>
+             </div>
+             
+             <div className="mb-4">
+               <p className="text-sm font-semibold text-gray-600">Previewing first 10 records of {totalRecords} total records found in <span className="text-blue-600 font-bold">{pendingFile?.name}</span>.</p>
+               <p className="text-xs text-orange-500 font-semibold mt-1">Please confirm this dataset looks correct before importing. Importing will replace your current dataset.</p>
+             </div>
+
+             <div className="flex-1 overflow-auto border rounded-xl custom-scrollbar" style={{ borderColor: "var(--color-border)" }}>
+               <table className="w-full text-left border-collapse">
+                 <thead className="sticky top-0 bg-gray-50 backdrop-blur-md z-10">
+                   <tr className="border-b border-gray-200">
+                     <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Student Name</th>
+                     <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Email</th>
+                     <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Course</th>
+                     <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Att.</th>
+                     <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-gray-500">Marks</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-gray-100 bg-white">
+                   {previewData.map((s, idx) => (
+                     <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                       <td className="p-4">
+                         <p className="text-sm font-semibold">{s.name}</p>
+                         <p className="text-[10px] text-gray-500">{s.registration_number}</p>
+                       </td>
+                       <td className="p-4 text-xs font-mono text-gray-500">{s.email}</td>
+                       <td className="p-4 text-xs font-semibold text-gray-600">{s.course_name}</td>
+                       <td className="p-4">
+                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.attendance < 75 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                           {s.attendance}%
+                         </span>
+                       </td>
+                       <td className="p-4">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.avg_score < 40 ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                           {s.avg_score}%
+                         </span>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+
+             <div className="flex gap-3 justify-end pt-5 mt-4 border-t border-gray-100">
+                <button className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors" onClick={() => { setShowPreviewModal(false); setPendingFile(null); }}>Cancel</button>
+                <button className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold bg-green-600 text-white rounded-xl shadow-lg shadow-green-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all" onClick={confirmImport} disabled={loading}>
+                    <Database size={16} /> {loading ? "Importing..." : "Confirm Import"}
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
       {showDraftSelectionPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl animate-fade-in border border-gray-100">

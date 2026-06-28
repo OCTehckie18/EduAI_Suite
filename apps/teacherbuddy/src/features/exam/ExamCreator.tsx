@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { 
   X, Plus, Trash2, Upload, FileText, Settings, 
   CheckCircle2, BrainCircuit, ListOrdered, Shuffle,
-  HelpCircle, ChevronDown, ChevronUp, Save, AlertCircle
+  HelpCircle, ChevronDown, ChevronUp, Save, AlertCircle,
+  Download, Table, Sparkles
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
@@ -37,9 +38,11 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
   const [randomize, setRandomize] = useState(initialData?.randomize_questions || false);
   const [questions, setQuestions] = useState<Question[]>(initialData?.questions || []);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [isMappingAnswers, setIsMappingAnswers] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [importTab, setImportTab] = useState<"smart" | "excel">("smart");
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
+  const [importSuccess, setImportSuccess] = useState("");
 
   React.useEffect(() => {
     fetchCourses();
@@ -108,11 +111,14 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
     setQuestions(newQuestions);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ── Smart Import: AI-powered single-step extraction ──
+  const handleSmartImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsExtracting(true);
+    setError("");
+    setImportSuccess("");
     const formData = new FormData();
     formData.append("file", file);
 
@@ -123,57 +129,111 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
+      
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || `Import failed (${response.status})`);
+      }
+      
       const data = await response.json();
-      if (Array.isArray(data)) {
-        // Ensure all extracted questions have 4 choices if they don't
+      if (Array.isArray(data) && data.length > 0) {
+        // Ensure all extracted questions have at least 4 choices
         const formatted = data.map(q => ({
-            ...q,
-            choices: q.choices.length < 4 
-              ? [...q.choices, ...Array(4 - q.choices.length).fill(0).map(() => ({ choice_text: "", is_correct: false }))]
+            question_text: q.question_text || "",
+            question_type: "mcq",
+            points: q.points || 1,
+            choices: (q.choices || []).length < 4 
+              ? [...(q.choices || []), ...Array(Math.max(0, 4 - (q.choices || []).length)).fill(0).map(() => ({ choice_text: "", is_correct: false }))]
               : q.choices
         }));
         setQuestions([...questions, ...formatted]);
+        setImportSuccess(`✅ Successfully imported ${formatted.length} questions with AI`);
+      } else {
+        setError("No questions could be extracted from this document. Try a clearer format or use Excel import.");
       }
-    } catch (err) {
-      console.error("Extraction failed", err);
+    } catch (err: any) {
+      console.error("Smart import failed", err);
+      setError(err.message || "Failed to extract questions. Please try again.");
     } finally {
       setIsExtracting(false);
+      // Reset file input
+      e.target.value = "";
     }
   };
 
-  const handleAnswerKeyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || questions.length === 0) return;
+  // ── Excel Import: Download template ──
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/template`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Failed to download template");
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "exam_questions_template.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Template download failed", err);
+      setError("Failed to download template. Please try again.");
+    }
+  };
 
-    setIsMappingAnswers(true);
+  // ── Excel Import: Upload filled spreadsheet ──
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImportingExcel(true);
+    setError("");
+    setImportSuccess("");
     const formData = new FormData();
     formData.append("file", file);
 
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_ENDPOINTS.EXAMS}/extract-answers`, {
+      const response = await fetch(`${API_ENDPOINTS.EXAMS}/import-excel`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
-      const answerMap = await response.json(); // e.g. { "1": "A", "2": "C" }
-      
-      const updatedQuestions = [...questions];
-      Object.entries(answerMap).forEach(([qNum, ansChar]) => {
-          const qIdx = parseInt(qNum) - 1;
-          const choiceIdx = (ansChar as string).charCodeAt(0) - 65; // A=0, B=1, ...
-          
-          if (updatedQuestions[qIdx] && updatedQuestions[qIdx].choices[choiceIdx]) {
-              updatedQuestions[qIdx].choices.forEach((c, idx) => {
-                  c.is_correct = (idx === choiceIdx);
-              });
-          }
-      });
-      setQuestions(updatedQuestions);
-    } catch (err) {
-        console.error("Mapping failed", err);
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || `Import failed (${response.status})`);
+      }
+
+      const data = await response.json();
+      if (data.questions && data.questions.length > 0) {
+        // Format imported questions to match internal structure
+        const formatted = data.questions.map((q: any) => ({
+          question_text: q.question_text || "",
+          question_type: "mcq",
+          points: q.points || 1,
+          choices: (q.choices || []).length < 4
+            ? [...(q.choices || []), ...Array(Math.max(0, 4 - (q.choices || []).length)).fill(0).map(() => ({ choice_text: "", is_correct: false }))]
+            : q.choices
+        }));
+        setQuestions([...questions, ...formatted]);
+        
+        let msg = `✅ Successfully imported ${data.imported_count} questions`;
+        if (data.errors && data.errors.length > 0) {
+          msg += ` (${data.errors.length} row(s) skipped)`;
+        }
+        setImportSuccess(msg);
+      } else {
+        setError("No valid questions found in the spreadsheet.");
+      }
+    } catch (err: any) {
+      console.error("Excel import failed", err);
+      setError(err.message || "Failed to import from spreadsheet.");
     } finally {
-        setIsMappingAnswers(false);
+      setIsImportingExcel(false);
+      e.target.value = "";
     }
   };
 
@@ -185,7 +245,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
         return;
     }
 
-    if (!courseId || isNaN(courseId)) {
+    if (!courseId || isNaN(courseId as any)) {
         setError("Please select a classroom.");
         return;
     }
@@ -319,31 +379,117 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
               </div>
             </section>
 
-            <section className="p-4 rounded-2xl bg-blue-50 border border-blue-100 space-y-4">
-              <h4 className="text-xs font-bold text-blue-700 flex items-center gap-2">
-                <Upload size={14} /> Smart Import
-              </h4>
-              
-              <div className="space-y-3">
-                <div>
-                    <p className="text-[10px] text-blue-600/70 mb-1.5 font-bold uppercase tracking-tight">Step 1: Upload Questions</p>
-                    <label className="btn btn-primary w-full text-xs py-2 cursor-pointer flex items-center justify-center gap-2 shadow-sm">
-                        <FileText size={12} /> {isExtracting ? "Parsing..." : "Select Question Paper"}
-                        <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleFileUpload} disabled={isExtracting} />
-                    </label>
-                </div>
-
-                <div className={questions.length === 0 ? "opacity-40 pointer-events-none" : ""}>
-                    <p className="text-[10px] text-blue-600/70 mb-1.5 font-bold uppercase tracking-tight">Step 2: Upload Answer Key</p>
-                    <label className="btn border-2 border-blue-200 text-blue-700 bg-white hover:bg-blue-50 w-full text-xs py-2 cursor-pointer flex items-center justify-center gap-2 shadow-sm">
-                        <CheckCircle2 size={12} /> {isMappingAnswers ? "Mapping..." : "Select Answer Key"}
-                        <input type="file" className="hidden" accept=".pdf,.docx" onChange={handleAnswerKeyUpload} disabled={isMappingAnswers || questions.length === 0} />
-                    </label>
-                </div>
+            {/* ── Import Section with Tabs ── */}
+            <section className="rounded-2xl bg-blue-50 border border-blue-100 overflow-hidden">
+              {/* Tab Switcher */}
+              <div className="flex border-b border-blue-100">
+                <button
+                  onClick={() => setImportTab("smart")}
+                  className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                    importTab === "smart" 
+                      ? "bg-white text-blue-700 border-b-2 border-blue-600 shadow-sm" 
+                      : "text-blue-400 hover:text-blue-600 hover:bg-blue-50/50"
+                  }`}
+                >
+                  <Sparkles size={12} /> Smart Import
+                </button>
+                <button
+                  onClick={() => setImportTab("excel")}
+                  className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                    importTab === "excel" 
+                      ? "bg-white text-blue-700 border-b-2 border-blue-600 shadow-sm" 
+                      : "text-blue-400 hover:text-blue-600 hover:bg-blue-50/50"
+                  }`}
+                >
+                  <Table size={12} /> Excel Import
+                </button>
               </div>
-              <p className="text-[9px] text-blue-600/60 leading-tight italic">
-                * Answer key should follow format: 1. A, 2. C...
-              </p>
+
+              <div className="p-4 space-y-3">
+                {/* ── Smart Import Tab ── */}
+                {importTab === "smart" && (
+                  <>
+                    <div className="flex items-start gap-2 p-2.5 rounded-xl bg-blue-100/50 border border-blue-200/50">
+                      <Sparkles size={14} className="text-blue-600 mt-0.5 shrink-0" />
+                      <p className="text-[10px] text-blue-700 leading-relaxed">
+                        Upload a <strong>PDF or DOCX</strong> question paper. AI will automatically extract questions, options, and correct answers.
+                      </p>
+                    </div>
+                    <label className={`btn w-full text-xs py-2.5 cursor-pointer flex items-center justify-center gap-2 shadow-sm transition-all ${
+                      isExtracting 
+                        ? "bg-blue-100 text-blue-600 border-blue-200" 
+                        : "btn-primary"
+                    }`}>
+                      {isExtracting ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-600 rounded-full animate-spin"></div>
+                          AI is analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <FileText size={13} /> Upload Question Paper
+                        </>
+                      )}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept=".pdf,.docx" 
+                        onChange={handleSmartImport} 
+                        disabled={isExtracting} 
+                      />
+                    </label>
+                  </>
+                )}
+
+                {/* ── Excel Import Tab ── */}
+                {importTab === "excel" && (
+                  <>
+                    <div className="flex items-start gap-2 p-2.5 rounded-xl bg-blue-100/50 border border-blue-200/50">
+                      <Table size={14} className="text-blue-600 mt-0.5 shrink-0" />
+                      <p className="text-[10px] text-blue-700 leading-relaxed">
+                        Download the template, fill in your questions (Kahoot-style), then re-upload. Correct answers are pre-marked.
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-blue-600/70 mb-1.5 font-bold uppercase tracking-tight">Step 1: Download Template</p>
+                      <button 
+                        onClick={handleDownloadTemplate}
+                        className="btn border-2 border-blue-200 text-blue-700 bg-white hover:bg-blue-50 w-full text-xs py-2 flex items-center justify-center gap-2 shadow-sm transition-all"
+                      >
+                        <Download size={13} /> Download .xlsx Template
+                      </button>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] text-blue-600/70 mb-1.5 font-bold uppercase tracking-tight">Step 2: Upload Filled Sheet</p>
+                      <label className={`btn w-full text-xs py-2 cursor-pointer flex items-center justify-center gap-2 shadow-sm transition-all ${
+                        isImportingExcel 
+                          ? "bg-blue-100 text-blue-600 border-blue-200" 
+                          : "btn-primary"
+                      }`}>
+                        {isImportingExcel ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-600 rounded-full animate-spin"></div>
+                            Importing...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={13} /> Upload Filled Spreadsheet
+                          </>
+                        )}
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept=".xlsx,.xls" 
+                          onChange={handleExcelUpload} 
+                          disabled={isImportingExcel} 
+                        />
+                      </label>
+                    </div>
+                  </>
+                )}
+              </div>
             </section>
           </div>
 
@@ -360,6 +506,17 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
                 <Plus size={14} /> Add Question
               </button>
             </div>
+
+            {/* Success Message */}
+            {importSuccess && (
+              <div className="p-3 rounded-xl bg-green-50 border border-green-100 flex items-center gap-2 text-green-600 text-xs animate-fade-in">
+                <CheckCircle2 size={14} />
+                <span>{importSuccess}</span>
+                <button onClick={() => setImportSuccess("")} className="ml-auto text-green-400 hover:text-green-600">
+                  <X size={12} />
+                </button>
+              </div>
+            )}
 
             {error && (
                 <div className="p-3 rounded-xl bg-red-50 border border-red-100 flex items-center gap-2 text-red-600 text-xs animate-shake">

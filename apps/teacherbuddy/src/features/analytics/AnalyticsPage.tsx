@@ -48,6 +48,8 @@ interface UploadedData {
     low_score?: string;
     score_column?: string;
     scale?: number;
+    missing_values?: number;
+    impute_method?: string;
   };
   distribution: { grade: string; pct: number; count: number }[];
   risk_students: any[];
@@ -58,16 +60,17 @@ interface UploadedData {
 /* ─── Components ─────────────────────────────────────── */
 
 const RiskCell: React.FC<{ value: number; label: string }> = ({ value, label }) => {
-  const color = value >= 75 ? "#dc2626" : value >= 50 ? "#d97706" : "#16a34a";
-  const bg    = value >= 75 ? "rgba(220,38,38,0.09)" : value >= 50 ? "rgba(217,119,6,0.09)" : "rgba(22,163,74,0.09)";
+  const safeValue = (value == null || isNaN(value)) ? 0 : Math.round(value);
+  const color = safeValue >= 75 ? "#dc2626" : safeValue >= 50 ? "#d97706" : "#16a34a";
+  const bg    = safeValue >= 75 ? "rgba(220,38,38,0.09)" : safeValue >= 50 ? "rgba(217,119,6,0.09)" : "rgba(22,163,74,0.09)";
   return (
     <div className="flex flex-col items-center gap-1">
       <div
         className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-transform hover:scale-110 cursor-pointer"
         style={{ background: bg, color, border: `1.5px solid ${color}30` }}
-        title={`${label}: ${value}`}
+        title={`${label}: ${safeValue}`}
       >
-        {value}
+        {safeValue}
       </div>
       <span className="text-[9px] text-center leading-tight" style={{ color: "var(--color-text-muted)", maxWidth: 36 }}>{label}</span>
     </div>
@@ -100,7 +103,7 @@ export const AnalyticsPage: React.FC = () => {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [imputeMethod, setImputeMethod] = useState("auto");
+  const imputeMethod = "blank";
   const [fileName, setFileName] = useState(persisted?.fileName || "");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -200,6 +203,50 @@ export const AnalyticsPage: React.FC = () => {
     }
   };
 
+  const handleExportReport = () => {
+    const data = dataSource === "platform" ? analytics : uploadedData;
+    if (!data) return;
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Overview metrics
+    csvContent += "OVERVIEW\n";
+    if (dataSource === "platform" && analytics) {
+      csvContent += `Class Average,${analytics.overview.avg_score}\n`;
+      csvContent += `Total Students,${analytics.overview.total_students}\n`;
+      csvContent += `At-Risk Count,${analytics.overview.at_risk_count}\n`;
+      csvContent += `Attendance Rate,${analytics.overview.attendance_rate}\n`;
+    } else if (uploadedData) {
+      csvContent += `Class Average,${uploadedData.summary.avg_score}\n`;
+      csvContent += `Total Students,${uploadedData.summary.rows}\n`;
+    }
+    csvContent += "\n";
+
+    // Risk Students Data
+    csvContent += "RISK STUDENTS\n";
+    csvContent += "Student ID,Student Name,Risk Factor,Risk Level,Avg Score,Missing Data\n";
+    const students = data.risk_students || [];
+    students.forEach((s: any) => {
+      const row = [
+        s.id,
+        `"${s.name}"`,
+        s.missing_data ? "N/A" : s.risk,
+        s.missing_data ? "No Data" : s.level,
+        s.avgScore,
+        s.missing_data ? "Yes" : "No"
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Risk_Report_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const COLORS = ['#264796', '#3460c4', '#d0ae61', '#d97706', '#dc2626'];
 
   const renderOverview = () => {
@@ -226,6 +273,16 @@ export const AnalyticsPage: React.FC = () => {
 
     return (
       <div className="space-y-6">
+        {/* Missing values banner */}
+        {dataSource === "upload" && uploadedData?.summary?.impute_method === "blank" && (uploadedData?.summary?.missing_values ?? 0) > 0 && (
+          <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
+            style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.2)" }}>
+            <Info size={14} className="text-orange-500 shrink-0" />
+            <p className="text-orange-700 font-medium">
+              <strong>Keep Blank mode:</strong> {uploadedData.summary.missing_values} missing value{uploadedData.summary.missing_values !== 1 ? 's' : ''} preserved in dataset. Averages and statistics are computed only from available data.
+            </p>
+          </div>
+        )}
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {stats.map((kpi, i) => (
@@ -391,8 +448,19 @@ export const AnalyticsPage: React.FC = () => {
     const students = dataSource === "platform" ? analytics?.risk_students : uploadedData?.risk_students;
     if (!students || students.length === 0) return <div className="text-center py-20 opacity-50">No at-risk students identified</div>;
 
+    const isMissingMode = dataSource === "upload" && uploadedData?.summary?.impute_method === "blank";
+
     return (
       <div className="space-y-3">
+        {isMissingMode && (
+          <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
+            style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.2)" }}>
+            <AlertTriangle size={14} className="text-orange-500 shrink-0" />
+            <p className="text-orange-700 font-medium">
+              <strong>Hide Imputation active:</strong> Students with missing score data are flagged separately below.
+            </p>
+          </div>
+        )}
         {students.map((s: any) => (
           <div key={s.id} className="animate-fade-in-up">
             <div
@@ -400,44 +468,63 @@ export const AnalyticsPage: React.FC = () => {
               onClick={() => setExpandedStudent(expandedStudent === s.id ? null : s.id)}
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                s.missing_data ? "bg-yellow-100 text-yellow-700" :
                 s.level === "high" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
               }`}>
-                {s.name.charAt(0)}
+                {s.missing_data ? "?" : s.name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800">{s.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-800">{s.name}</p>
+                  {s.missing_data && (
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">
+                      MISSING DATA
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-slate-500">{s.id}</p>
               </div>
-              <div className="flex gap-4">
-                 <RiskCell value={100 - (s.attendance || 80)} label="Absent" />
-                 <RiskCell value={100 - s.avgScore} label="Marks" />
-              </div>
+              {!s.missing_data && (
+                <div className="flex gap-4">
+                   <RiskCell value={100 - (s.attendance || 80)} label="Absent" />
+                   <RiskCell value={100 - s.avgScore} label="Marks" />
+                </div>
+              )}
               <div className="w-16 text-center">
-                <p className={`text-lg font-black ${s.level === "high" ? "text-red-600" : "text-orange-600"}`}>{s.risk}</p>
-                <span className={`text-[9px] font-bold uppercase ${s.level === "high" ? "text-red-500" : "text-orange-500"}`}>{s.level}</span>
+                <p className={`text-lg font-black ${s.missing_data ? "text-yellow-600" : s.level === "high" ? "text-red-600" : "text-orange-600"}`}>{s.missing_data ? "—" : s.risk}</p>
+                <span className={`text-[9px] font-bold uppercase ${s.missing_data ? "text-yellow-500" : s.level === "high" ? "text-red-500" : "text-orange-500"}`}>{s.missing_data ? "no data" : s.level}</span>
               </div>
               <ChevronDown size={16} className={`text-slate-400 transition-transform ${expandedStudent === s.id ? "rotate-180" : ""}`} />
             </div>
             {expandedStudent === s.id && (
               <div className="mx-4 p-4 rounded-b-xl border-x border-b border-slate-100 bg-slate-50/50 animate-slide-down space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
-                    <p className="text-xs text-slate-500 mb-1">Avg Score</p>
-                    <p className="text-lg font-bold text-slate-800">{s.avgScore.toFixed(1)}%</p>
+                {s.missing_data ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-yellow-700 font-semibold mb-1">⚠ No score data available</p>
+                    <p className="text-xs text-slate-500">This student has missing values in the dataset. Switch to an imputation method to estimate their score.</p>
                   </div>
-                  <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
-                    <p className="text-xs text-slate-500 mb-1">Attendance</p>
-                    <p className="text-lg font-bold text-slate-800">{s.attendance || 85}%</p>
-                  </div>
-                  <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
-                    <p className="text-xs text-slate-500 mb-1">Risk Factor</p>
-                    <p className={`text-lg font-bold ${s.level === 'high' ? 'text-red-600' : 'text-orange-600'}`}>{s.risk}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button className="btn btn-primary text-xs flex-1 py-2">Create Intervention Plan</button>
-                  <button className="btn btn-outline text-xs flex-1 py-2">Notify Parents</button>
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
+                        <p className="text-xs text-slate-500 mb-1">Avg Score</p>
+                        <p className="text-lg font-bold text-slate-800">{s.avgScore.toFixed(1)}%</p>
+                      </div>
+                      <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
+                        <p className="text-xs text-slate-500 mb-1">Attendance</p>
+                        <p className="text-lg font-bold text-slate-800">{s.attendance || 85}%</p>
+                      </div>
+                      <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
+                        <p className="text-xs text-slate-500 mb-1">Risk Factor</p>
+                        <p className={`text-lg font-bold ${s.level === 'high' ? 'text-red-600' : 'text-orange-600'}`}>{s.risk}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="btn btn-primary text-xs flex-1 py-2">Create Intervention Plan</button>
+                      <button className="btn btn-outline text-xs flex-1 py-2">Notify Parents</button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -537,23 +624,21 @@ export const AnalyticsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 mr-4">
-            <span className="text-[10px] font-bold text-slate-400">IMPUTE:</span>
-            <select 
-              className="text-[10px] font-bold bg-slate-100 rounded-lg border-none py-1 px-2 focus:ring-0"
-              value={imputeMethod}
-              onChange={e => setImputeMethod(e.target.value)}
-            >
-              <option value="auto">✨ Smart Impute</option>
-              <option value="zero">Fill Zeros</option>
-              <option value="mean">Average Impute</option>
-              <option value="blank">Keep Blank</option>
-            </select>
-          </div>
-          <button className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors">
+          <button onClick={() => {
+            if (dataSource === "platform" && selectedCourseId) {
+              setLoading(true);
+              fetch(`${API_BASE}/analytics/course/${selectedCourseId}`)
+                .then(res => res.json())
+                .then(data => { setAnalytics(data); setLoading(false); })
+                .catch(() => setLoading(false));
+            }
+          }} className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors">
             <RefreshCw size={18} className={loading || uploading ? "animate-spin" : ""} />
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors">
+          <button 
+            onClick={handleExportReport}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold hover:bg-blue-100 transition-colors"
+          >
             <Download size={14} /> Export Report
           </button>
         </div>
@@ -631,9 +716,15 @@ export const AnalyticsPage: React.FC = () => {
                     <tbody className="divide-y divide-slate-50">
                       {(dataSource === "platform" ? (analytics?.raw_data || []) : (uploadedData?.raw_data || []))?.map((row: any, idx: number) => (
                         <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                          {(dataSource === "platform" ? ['Student', 'Score', 'Exam', 'Date'] : (uploadedData?.summary?.columns || []))?.map((col: string) => (
-                            <td key={col} className="px-4 py-3 text-slate-600 font-medium">{String(row[col])}</td>
-                          ))}
+                          {(dataSource === "platform" ? ['Student', 'Score', 'Exam', 'Date'] : (uploadedData?.summary?.columns || []))?.map((col: string) => {
+                            const val = row[col];
+                            const isMissing = val === null || val === undefined || val === '';
+                            return (
+                              <td key={col} className={`px-4 py-3 font-medium ${isMissing ? 'text-slate-300 italic' : 'text-slate-600'}`}>
+                                {isMissing ? '—' : String(val)}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                       {dataSource === "platform" && (analytics?.raw_data || []).length === 0 && (

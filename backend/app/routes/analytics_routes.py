@@ -9,6 +9,7 @@ import pandas as pd
 import io
 import numpy as np
 from datetime import datetime
+import json
 
 analytics_router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -182,7 +183,13 @@ async def upload_analytics_data(
     id_keywords = ['id', 'reg', 'number', 'roll', 'serial', 'sn', 'index', 'phone', 'mobile', 'code', 'year', 'semester']
     valid_numeric_cols = [c for c in numeric_cols if not any(k in c for k in id_keywords)]
     
-    if impute_method == "auto" or impute_method == "zero":
+    # Track missing values before imputation
+    missing_before = int(df[valid_numeric_cols].isna().sum().sum()) if len(valid_numeric_cols) > 0 else 0
+
+    if impute_method == "blank":
+        # "Keep Blank" / Hide imputation: only replace inf, preserve NaN
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan)
+    elif impute_method == "auto" or impute_method == "zero":
         for col in valid_numeric_cols:
             if any(k in col for k in ['total', 'sum', 'grand', 'final']):
                 components = [c for c in valid_numeric_cols if any(k in c for k in ['score', 'exam', 'quiz', 'assign', 'mid', 'final', 'test']) and c != col]
@@ -192,10 +199,12 @@ async def upload_analytics_data(
                     df[col] = df[col].fillna(0)
             else:
                 df[col] = df[col].fillna(0)
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
     elif impute_method == "mean":
         df[valid_numeric_cols] = df[valid_numeric_cols].fillna(df[valid_numeric_cols].mean().fillna(0))
-    
-    df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+
+    missing_after = int(df[valid_numeric_cols].isna().sum().sum()) if len(valid_numeric_cols) > 0 else 0
 
     score_col = None
     priority_keywords = ['grand_total', 'final_score', 'total_marks', 'total', 'final', 'score', 'marks', 'percentage']
@@ -212,24 +221,27 @@ async def upload_analytics_data(
         score_col = valid_numeric_cols[0]
     
     if score_col:
-        max_val = df[score_col].max()
+        max_val = df[score_col].max(skipna=True)
         scale = 100
         if 0 < max_val <= 10: scale = 10
         elif 10 < max_val <= 20: scale = 20
         elif 20 < max_val <= 50: scale = 50
         
         normalized_series = (df[score_col] / scale) * 100
-        avg_score = float(df[score_col].mean())
-        std_dev = float(df[score_col].std())
-        pass_rate = (normalized_series >= 40).mean() * 100 
+        # Use skipna for NaN-safe aggregations
+        avg_score = float(df[score_col].mean(skipna=True)) if df[score_col].notna().any() else 0.0
+        std_dev = float(df[score_col].std(skipna=True)) if df[score_col].notna().sum() > 1 else 0.0
+        non_null_normalized = normalized_series.dropna()
+        pass_rate = float((non_null_normalized >= 40).mean() * 100) if len(non_null_normalized) > 0 else 0.0
         
-        # Grading Distribution
+        # Grading Distribution (only for non-null scores)
         bins = [0, 40, 45, 50, 55, 60, 70, 80, 101]
         labels = ['F (Fail)', 'P (Pass)', 'C (Fair)', 'B (Satisfactory)', 'B+ (Good)', 'A (Very Good)', 'A+ (Excellent)', 'O (Outstanding)']
         df['grade_group'] = pd.cut(normalized_series, bins=bins, labels=labels, right=False)
         df['grade_group'] = df['grade_group'].astype(str)
         distribution = df['grade_group'].value_counts().to_dict()
-        dist_list = [{"grade": k, "pct": int((v / len(df)) * 100), "count": int(v)} for k, v in distribution.items() if k != 'nan']
+        total_graded = sum(v for k, v in distribution.items() if k != 'nan')
+        dist_list = [{"grade": k, "pct": int((v / total_graded) * 100) if total_graded > 0 else 0, "count": int(v)} for k, v in distribution.items() if k != 'nan']
         
         # Student List for Bell Curve
         name_col = 'name' if 'name' in df.columns else 'student_name' if 'student_name' in df.columns else df.columns[0]
@@ -237,39 +249,79 @@ async def upload_analytics_data(
         
         student_points = []
         for _, row in df.iterrows():
+            score_val = row[score_col]
+            # Skip students with missing scores for bell curve (they have no data to plot)
+            if pd.isna(score_val):
+                continue
             student_points.append({
                 "name": str(row.get(name_col, 'Unknown')),
                 "roll": str(row.get(roll_col, 'N/A')),
-                "score": float(row[score_col])
+                "score": float(score_val)
             })
 
         risk_students = []
-        for _, row in df[normalized_series < 50].iterrows():
+        # Filter only non-null scores for risk assessment
+        risk_mask = normalized_series < 50
+        risk_mask = risk_mask & normalized_series.notna()
+        for _, row in df[risk_mask].iterrows():
+            score_val = row[score_col]
+            if pd.isna(score_val):
+                continue
             risk_students.append({
                 "id": str(row.get(roll_col, 'N/A')),
                 "name": str(row.get(name_col, 'Unknown')),
-                "avgScore": float(row[score_col]),
-                "risk": int(100 - (row[score_col]/scale)*100),
-                "level": "high" if (row[score_col]/scale)*100 < 40 else "moderate"
+                "avgScore": float(score_val),
+                "risk": int(100 - (score_val/scale)*100),
+                "level": "high" if (score_val/scale)*100 < 40 else "moderate"
             })
+
+        # Also flag students with missing score data as "data-missing" risk
+        if impute_method == "blank":
+            missing_score_mask = df[score_col].isna()
+            for _, row in df[missing_score_mask].iterrows():
+                risk_students.append({
+                    "id": str(row.get(roll_col, 'N/A')),
+                    "name": str(row.get(name_col, 'Unknown')),
+                    "avgScore": 0,
+                    "risk": 100,
+                    "level": "high",
+                    "missing_data": True
+                })
     else:
         avg_score, std_dev, pass_rate, scale = 0, 0, 0, 100
         dist_list, student_points, risk_students = [], [], []
+        missing_before, missing_after = 0, 0
+
+    # Prepare raw_data: replace NaN with None for JSON compatibility
+    raw_df = df.head(100).copy()
+    # Drop the grade_group helper column if it exists
+    if 'grade_group' in raw_df.columns:
+        raw_df = raw_df.drop(columns=['grade_group'])
+    raw_data = json.loads(raw_df.to_json(orient='records'))
+
+    # Safely compute high/low scores
+    if score_col and df[score_col].notna().any():
+        high_score = f"{df[score_col].max(skipna=True):.1f}"
+        low_score = f"{df[score_col].min(skipna=True):.1f}"
+    else:
+        high_score, low_score = "0", "0"
 
     return {
         "summary": {
             "rows": len(df),
-            "columns": list(df.columns),
+            "columns": [c for c in df.columns if c != 'grade_group'],
             "score_column": score_col,
             "scale": scale,
             "avg_score": f"{avg_score:.1f}",
-            "std_dev": std_dev,
+            "std_dev": std_dev if not (isinstance(std_dev, float) and np.isnan(std_dev)) else 0,
             "pass_rate": f"{pass_rate:.0f}%",
-            "high_score": f"{df[score_col].max():.1f}" if score_col else "0",
-            "low_score": f"{df[score_col].min():.1f}" if score_col else "0"
+            "high_score": high_score,
+            "low_score": low_score,
+            "missing_values": missing_after,
+            "impute_method": impute_method
         },
         "distribution": dist_list,
         "risk_students": risk_students,
         "student_points": student_points,
-        "raw_data": df.to_dict(orient='records')[:100] 
+        "raw_data": raw_data
     }

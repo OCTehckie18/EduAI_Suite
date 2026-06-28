@@ -27,11 +27,69 @@ class DraftCreate(BaseModel):
     student_ids: Optional[List[int]] = None
     conditions: Optional[List[dict]] = None
 
+class TemporaryStudent(BaseModel):
+    id: int
+    name: str
+    email: str
+    registration_number: str
+    attendance: float
+    avg_score: float
+
 class SendMailRequest(BaseModel):
-    student_ids: List[int]
+    student_ids: Optional[List[int]] = []
+    temporary_students: Optional[List[TemporaryStudent]] = []
     subject: Optional[str] = None
     body: Optional[str] = None
     draft_ids: Optional[List[int]] = None
+
+@mail_router.post("/preview_upload")
+async def preview_upload(file: UploadFile = File(...)):
+    content = await file.read()
+    try:
+        if file.filename.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(content))
+        elif file.filename.endswith(".xlsx"):
+            df = pd.read_excel(io.BytesIO(content))
+        else:
+            raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+        
+    df.columns = df.columns.str.strip().str.lower()
+    
+    def get_val(row, possible_names, default=""):
+        for name in possible_names:
+            if name in row.index:
+                val = row[name]
+                return default if pd.isna(val) else val
+        return default
+
+    preview_data = []
+    
+    for idx, row in df.head(10).iterrows():
+        try:
+            att_val = int(float(get_val(row, ['att', 'attendance', 'attendance (%)', 'attendance%'], 0)))
+        except ValueError:
+            att_val = 0
+            
+        try:
+            marks_val = int(float(get_val(row, ['marks', 'score', 'average marks', 'avg_score', 'total marks'], 0)))
+        except ValueError:
+            marks_val = 0
+
+        preview_data.append({
+            "registration_number": str(get_val(row, ['reg', 'registration number', 'reg no', 'register number', 'roll no', 'reg_no', 'registration_number'])),
+            "name": str(get_val(row, ['name', 'student name', 'full name', 'student_name'])),
+            "email": str(get_val(row, ['email', 'email address', 'email id', 'email_address'])),
+            "course_name": str(get_val(row, ['course', 'program', 'degree', 'course_id'], 'Default Course')),
+            "attendance": att_val,
+            "avg_score": marks_val
+        })
+        
+    return {
+        "total_records": len(df),
+        "preview": preview_data
+    }
 
 @mail_router.post("/upload_students")
 async def upload_students(file: UploadFile = File(...)):
@@ -56,11 +114,12 @@ async def upload_students(file: UploadFile = File(...)):
                 return default if pd.isna(val) else val
         return default
 
-    await Student.find_all().delete()
+    # await Student.find_all().delete() # removed for temporary data behavior
     
     students_to_insert = []
+    temp_id_start = 9000000
     
-    for _, row in df.iterrows():
+    for idx, row in df.iterrows():
         course_name = str(get_val(row, ['course', 'program', 'degree', 'course_id'], 'Default Course'))
         if not course_name or course_name.lower() == 'nan':
             course_name = 'Default Course'
@@ -81,23 +140,20 @@ async def upload_students(file: UploadFile = File(...)):
         except ValueError:
             marks_val = 0
 
-        student = Student(
-            registration_number=str(get_val(row, ['reg', 'registration number', 'reg no', 'register number', 'roll no', 'reg_no', 'registration_number'])),
-            name=str(get_val(row, ['name', 'student name', 'full name', 'student_name'])),
-            email=str(get_val(row, ['email', 'email address', 'email id', 'email_address'])),
-            course_id=course.int_id,
-            department=str(get_val(row, ['dept', 'department'])),
-            attendance=att_val,
-            avg_score=marks_val,
-            student_class="2026"
-        )
-        await student.assign_id()
-        students_to_insert.append(student)
+        student_dict = {
+            "id": temp_id_start + idx,
+            "registration_number": str(get_val(row, ['reg', 'registration number', 'reg no', 'register number', 'roll no', 'reg_no', 'registration_number'])),
+            "name": str(get_val(row, ['name', 'student name', 'full name', 'student_name'])),
+            "email": str(get_val(row, ['email', 'email address', 'email id', 'email_address'])),
+            "course_id": course.int_id if course else 0,
+            "department": str(get_val(row, ['dept', 'department'])),
+            "attendance": att_val,
+            "avg_score": marks_val,
+            "student_class": "2026"
+        }
+        students_to_insert.append(student_dict)
         
-    if students_to_insert:
-        await Student.insert_many(students_to_insert)
-        
-    return {"message": "Students uploaded successfully"}
+    return {"message": "Data parsed successfully", "data": students_to_insert}
 
 @mail_router.post("/filter")
 async def filter_students(req: FilterRequest):
@@ -181,10 +237,25 @@ async def get_history():
 
 @mail_router.post("/send")
 async def send_bulk_mail(req: SendMailRequest, background_tasks: BackgroundTasks):
-    students = await Student.find({"int_id": {"$in": req.student_ids}}).to_list()
+    db_students = []
+    if req.student_ids:
+        db_students = await Student.find({"int_id": {"$in": req.student_ids}}).to_list()
+        
+    all_students_data = [{"id": s.int_id, "name": s.name, "email": s.email, "registration_number": s.registration_number, "attendance": s.attendance, "avg_score": s.avg_score} for s in db_students]
     
-    if not students:
-        raise HTTPException(status_code=404, detail="No students found for the given IDs")
+    if req.temporary_students:
+        for ts in req.temporary_students:
+            all_students_data.append({
+                "id": ts.id,
+                "name": ts.name,
+                "email": ts.email,
+                "registration_number": ts.registration_number,
+                "attendance": ts.attendance,
+                "avg_score": ts.avg_score
+            })
+            
+    if not all_students_data:
+        raise HTTPException(status_code=404, detail="No students found for the given IDs or temporary list")
 
     mails_to_send = []
     
@@ -198,25 +269,25 @@ async def send_bulk_mail(req: SendMailRequest, background_tasks: BackgroundTasks
         raise HTTPException(status_code=400, detail="Provide draft_ids or subject/body")
 
     sent_count = 0
-    recipients_data = [{"id": s.int_id, "name": s.name, "email": s.email} for s in students]
+    recipients_data = [{"id": s["id"], "name": s["name"], "email": s["email"]} for s in all_students_data]
 
     for mail_item in mails_to_send:
         history = MailHistory(
             subject=mail_item["subject"],
             body=mail_item["body"],
             recipients=recipients_data,
-            recipient_count=len(students)
+            recipient_count=len(all_students_data)
         )
         await history.assign_id()
         await history.insert()
         
-        for student in students:
-            personalized_body = mail_item["body"].replace("{{name}}", student.name) \
-                                        .replace("{{reg_num}}", student.registration_number) \
-                                        .replace("{{attendance}}", f"{student.attendance}%") \
-                                        .replace("{{marks}}", f"{student.avg_score}%")
+        for student in all_students_data:
+            personalized_body = mail_item["body"].replace("{{name}}", student["name"]) \
+                                        .replace("{{reg_num}}", student["registration_number"]) \
+                                        .replace("{{attendance}}", f"{student['attendance']}%") \
+                                        .replace("{{marks}}", f"{student['avg_score']}%")
             
-            background_tasks.add_task(send_email, student.email, mail_item["subject"], personalized_body)
+            background_tasks.add_task(send_email, student["email"], mail_item["subject"], personalized_body)
             sent_count += 1
             
     # Log to ActionHistory

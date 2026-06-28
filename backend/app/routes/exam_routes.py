@@ -145,6 +145,202 @@ async def get_course_exams(course_id: int):
     exams = await Exam.find(Exam.course_id == course_id).to_list()
     return [ExamResponse(**format_exam_response(e)) for e in exams]
 
+@exam_router.get("/template")
+async def download_exam_template():
+    """Download a Kahoot-style Excel template for bulk question import."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from fastapi.responses import StreamingResponse
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Questions"
+    
+    # ── Styling ──
+    header_font = Font(name="Calibri", bold=True, size=12, color="FFFFFF")
+    header_fill = PatternFill(start_color="264796", end_color="264796", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style="thin", color="D0D0D0"),
+        right=Side(style="thin", color="D0D0D0"),
+        top=Side(style="thin", color="D0D0D0"),
+        bottom=Side(style="thin", color="D0D0D0"),
+    )
+    
+    # ── Headers ──
+    headers = ["Question", "Option A", "Option B", "Option C", "Option D", "Correct Answer (A/B/C/D)", "Points"]
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+    
+    # ── Column widths ──
+    ws.column_dimensions["A"].width = 50  # Question
+    ws.column_dimensions["B"].width = 25  # Option A
+    ws.column_dimensions["C"].width = 25  # Option B
+    ws.column_dimensions["D"].width = 25  # Option C
+    ws.column_dimensions["E"].width = 25  # Option D
+    ws.column_dimensions["F"].width = 18  # Correct Answer
+    ws.column_dimensions["G"].width = 10  # Points
+    
+    # ── Example rows ──
+    example_data = [
+        ["What is the capital of France?", "London", "Paris", "Berlin", "Madrid", "B", 1],
+        ["Which planet is known as the Red Planet?", "Venus", "Jupiter", "Mars", "Saturn", "C", 1],
+    ]
+    
+    example_fill = PatternFill(start_color="F0F4FF", end_color="F0F4FF", fill_type="solid")
+    example_font = Font(name="Calibri", size=11, color="666666", italic=True)
+    
+    for row_idx, row_data in enumerate(example_data, 2):
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.fill = example_fill
+            cell.font = example_font
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+    
+    # ── Instructions sheet ──
+    ws_info = wb.create_sheet("Instructions")
+    instructions = [
+        "HOW TO USE THIS TEMPLATE",
+        "",
+        "1. Fill in your questions starting from Row 2 on the 'Questions' sheet.",
+        "2. You can delete or overwrite the example rows.",
+        "3. Each row = one MCQ question.",
+        "4. Fill in columns A through E with the question and four options.",
+        "5. In column F ('Correct Answer'), type A, B, C, or D to indicate the correct option.",
+        "6. Column G ('Points') is optional — defaults to 1 if left blank.",
+        "7. Save the file and upload it back in the Exam Creator.",
+        "",
+        "RULES:",
+        "• All questions must have at least Options A and B filled.",
+        "• The Correct Answer column must contain A, B, C, or D.",
+        "• Do not modify the header row.",
+    ]
+    
+    for row_idx, line in enumerate(instructions, 1):
+        cell = ws_info.cell(row=row_idx, column=1, value=line)
+        if row_idx == 1:
+            cell.font = Font(name="Calibri", bold=True, size=14, color="264796")
+        elif line.startswith("RULES"):
+            cell.font = Font(name="Calibri", bold=True, size=11)
+        else:
+            cell.font = Font(name="Calibri", size=11)
+    ws_info.column_dimensions["A"].width = 80
+    
+    # ── Write to buffer ──
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=exam_questions_template.xlsx"}
+    )
+
+
+@exam_router.post("/import-excel")
+async def import_exam_from_excel(file: UploadFile = File(...)):
+    """Import MCQ questions from a filled Excel template."""
+    import openpyxl
+    
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Please upload an Excel file (.xlsx)")
+    
+    contents = await file.read()
+    
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read Excel file: {str(e)}")
+    
+    ws = wb.active
+    
+    # Validate headers
+    headers = [str(cell.value or "").strip().lower() for cell in ws[1]]
+    if len(headers) < 6:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid template format. Please use the provided template with at least 6 columns."
+        )
+    
+    questions = []
+    errors = []
+    
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        # Skip completely empty rows
+        if not row or all(cell is None or str(cell).strip() == "" for cell in row):
+            continue
+        
+        question_text = str(row[0] or "").strip() if len(row) > 0 else ""
+        option_a = str(row[1] or "").strip() if len(row) > 1 else ""
+        option_b = str(row[2] or "").strip() if len(row) > 2 else ""
+        option_c = str(row[3] or "").strip() if len(row) > 3 else ""
+        option_d = str(row[4] or "").strip() if len(row) > 4 else ""
+        correct_raw = str(row[5] or "").strip().upper() if len(row) > 5 else ""
+        points_raw = row[6] if len(row) > 6 else None
+        
+        # Validate question
+        if not question_text:
+            errors.append(f"Row {row_idx}: Missing question text")
+            continue
+        
+        if not option_a or not option_b:
+            errors.append(f"Row {row_idx}: At least Options A and B are required")
+            continue
+        
+        if correct_raw not in ("A", "B", "C", "D"):
+            errors.append(f"Row {row_idx}: Correct Answer must be A, B, C, or D (got '{correct_raw}')")
+            continue
+        
+        # Build choices
+        options = [
+            {"label": "A", "text": option_a},
+            {"label": "B", "text": option_b},
+        ]
+        if option_c:
+            options.append({"label": "C", "text": option_c})
+        if option_d:
+            options.append({"label": "D", "text": option_d})
+        
+        # Validate correct answer points to an existing option
+        if correct_raw == "C" and not option_c:
+            errors.append(f"Row {row_idx}: Correct answer is C but Option C is empty")
+            continue
+        if correct_raw == "D" and not option_d:
+            errors.append(f"Row {row_idx}: Correct answer is D but Option D is empty")
+            continue
+        
+        try:
+            points = float(points_raw) if points_raw is not None else 1.0
+        except (ValueError, TypeError):
+            points = 1.0
+        
+        questions.append({
+            "question_text": question_text,
+            "points": points,
+            "choices": [
+                {
+                    "choice_text": o["text"],
+                    "is_correct": (o["label"] == correct_raw)
+                }
+                for o in options
+            ]
+        })
+    
+    if not questions and errors:
+        raise HTTPException(status_code=400, detail=f"No valid questions found. Errors: {'; '.join(errors[:5])}")
+    
+    return {
+        "questions": questions,
+        "imported_count": len(questions),
+        "errors": errors[:10] if errors else []
+    }
+
 @exam_router.get("/{exam_id}", response_model=ExamResponse)
 async def get_exam(exam_id: int):
     exam = await Exam.find_one(Exam.int_id == exam_id)
@@ -239,6 +435,7 @@ async def submit_exam_attempt(exam_id: int, attempt_id: int, submission: ExamAtt
 
 @exam_router.post("/extract")
 async def extract_exam_questions(file: UploadFile = File(...)):
+    """Extract MCQ questions from PDF/DOCX using AI (Groq) with regex fallback."""
     contents = await file.read()
     text = ""
     
@@ -257,93 +454,168 @@ async def extract_exam_questions(file: UploadFile = File(...)):
                 text_parts.append(row_text)
         text = "\n".join(text_parts)
     else:
-        raise HTTPException(status_code=400, detail="Unsupported format")
+        raise HTTPException(status_code=400, detail="Unsupported format. Please upload a .pdf or .docx file.")
 
-    # Advanced MCQ Extraction Logic
-    has_explicit_q = bool(re.search(r'(?:^|\n)\s*(?:Q|Question)\s*\d+', text, re.IGNORECASE))
-    if has_explicit_q:
-        q_pattern = r'(?:^|\n)\s*(?:Q(?:uestion)?\s*\d+[\.\)\:\-]?)\s*'
-    else:
-        q_pattern = r'(?:^|\n)\s*(?:Q(?:uestion)?\s*\d+[\.\)\:\-]?|\d+[\.\)\:\-])\s*'
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Could not extract any text from the uploaded file.")
 
-    q_blocks = re.split(q_pattern, text, flags=re.IGNORECASE)
+    # ── Attempt 1: AI-powered extraction via Groq ──
+    try:
+        from app.services.groq_service import GroqService, DEFAULT_MODEL
+        if GroqService._available and GroqService._client:
+            # Truncate very long documents to avoid token limits
+            truncated_text = text[:12000] if len(text) > 12000 else text
+
+            prompt = f"""You are an expert exam parser. Extract ALL multiple-choice questions (MCQs) from the following exam document text.
+
+For each question, return:
+- question_text: the full question text
+- choices: an array of objects, each with "choice_text" (the option text) and "is_correct" (boolean, true for the correct answer)
+
+Rules:
+1. Extract EVERY question you can find — do not skip any.
+2. Each question MUST have at least 2 choices (ideally 4).
+3. If the correct answer is indicated anywhere in the document (answer key, inline marking, bold/underlined option), set is_correct=true for that choice. If NO correct answer is identifiable, set all is_correct=false.
+4. Clean up the text — remove question numbers, trailing whitespace, and artifacts from PDF extraction.
+5. Return ONLY a valid JSON array. No markdown fences, no explanation, no extra text.
+
+Example output format:
+[
+  {{
+    "question_text": "What is the capital of France?",
+    "choices": [
+      {{"choice_text": "London", "is_correct": false}},
+      {{"choice_text": "Paris", "is_correct": true}},
+      {{"choice_text": "Berlin", "is_correct": false}},
+      {{"choice_text": "Madrid", "is_correct": false}}
+    ]
+  }}
+]
+
+Document text:
+\"\"\"
+{truncated_text}
+\"\"\"
+
+Return ONLY the JSON array:"""
+
+            response = GroqService._client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=DEFAULT_MODEL,
+                max_tokens=4096,
+                temperature=0.1,
+            )
+            
+            ai_text = response.choices[0].message.content.strip()
+            
+            # Strip markdown code fences if present
+            if ai_text.startswith("```"):
+                ai_text = re.sub(r'^```(?:json)?\s*', '', ai_text)
+                ai_text = re.sub(r'\s*```$', '', ai_text)
+            
+            import json
+            questions = json.loads(ai_text)
+            
+            if isinstance(questions, list) and len(questions) > 0:
+                # Validate structure
+                valid_questions = []
+                for q in questions:
+                    if isinstance(q, dict) and "question_text" in q and "choices" in q:
+                        if isinstance(q["choices"], list) and len(q["choices"]) >= 2:
+                            valid_choices = [
+                                {
+                                    "choice_text": str(c.get("choice_text", "")).strip(),
+                                    "is_correct": bool(c.get("is_correct", False))
+                                }
+                                for c in q["choices"] if isinstance(c, dict)
+                            ]
+                            if len(valid_choices) >= 2:
+                                valid_questions.append({
+                                    "question_text": str(q["question_text"]).strip(),
+                                    "choices": valid_choices
+                                })
+                
+                if valid_questions:
+                    return valid_questions
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"AI extraction failed, falling back to regex: {e}")
+
+    # ── Attempt 2: Improved regex-based fallback ──
+    # Try multiple question patterns for broader compatibility
+    patterns_to_try = [
+        # Pattern 1: Explicit "Q" or "Question" prefix
+        r'(?:^|\n)\s*(?:Q(?:uestion)?)\s*(\d+)\s*[\.)\:\-]?\s*',
+        # Pattern 2: Numbered questions (e.g. "1.", "1)", "1:")
+        r'(?:^|\n)\s*(\d+)\s*[\.)\:\-]\s+',
+    ]
     
     questions = []
-    for block in q_blocks:
-        if not block.strip(): continue
-        
-        # Extract correct answer if present in the block
-        correct_answer = ""
-        ans_match = re.search(r'(?:^|\n|\s)(?:Answer|Ans)[^\w]*([A-Ea-e])', block, re.IGNORECASE)
-        if ans_match:
-            correct_answer = ans_match.group(1).upper()
-            block = block[:ans_match.start()] + block[ans_match.end():]
-        
-        # Try to find where options start
-        label_pattern_str = r'(?:^|\n|\s)(?:\()?([A-Ea-e])(?:(?:\)|\.)\s+|(?:\)|\.)?\s*\n)'
-        opt_start_match = re.search(label_pattern_str, block, re.IGNORECASE)
-        
-        options = []
-        if opt_start_match:
-            q_text = block[:opt_start_match.start()].strip()
-            options_text = block[opt_start_match.start():]
-            
-            label_pattern = re.compile(label_pattern_str, re.IGNORECASE)
-            labels = list(label_pattern.finditer(options_text))
-            
-            for i, match in enumerate(labels):
-                label = match.group(1).upper()
-                start_idx = match.end()
-                if i + 1 < len(labels):
-                    end_idx = labels[i+1].start()
-                else:
-                    end_idx = len(options_text)
-                    
-                opt_text = options_text[start_idx:end_idx].strip()
-                options.append({"label": label, "text": opt_text})
-        else:
-            q_text = block.strip()
-            
-        if q_text and options:
-            questions.append({
-                "question_text": q_text.replace('\n', '\n').strip(),
-                "choices": [
-                    {"choice_text": o["text"].replace('\n', ' ').strip(), "is_correct": (o["label"] == correct_answer)}
-                    for o in options
+    
+    for q_pattern in patterns_to_try:
+        q_splits = re.split(q_pattern, text, flags=re.IGNORECASE)
+        if len(q_splits) > 2:  # Found matches (split produces alternating groups)
+            # Process blocks — every other element is a question block
+            for i in range(1, len(q_splits), 2):
+                block = q_splits[i + 1] if (i + 1) < len(q_splits) else ""
+                if not block.strip():
+                    continue
+                
+                # Extract inline correct answer if present
+                correct_answer = ""
+                ans_match = re.search(
+                    r'(?:^|\n|\s)(?:Answer|Ans|Correct)[^A-Za-z]*([A-Ea-e])\b',
+                    block, re.IGNORECASE
+                )
+                if ans_match:
+                    correct_answer = ans_match.group(1).upper()
+                    block = block[:ans_match.start()] + block[ans_match.end():]
+                
+                # Find options using multiple option patterns
+                option_patterns = [
+                    # (A) text or A) text or A. text
+                    r'(?:^|\n)\s*\(?([A-Ea-e])\)?[\.\)]\s*(.*?)(?=(?:\n\s*\(?[A-Ea-e]\)?[\.\)]|\Z))',
+                    # a) text, a. text (lowercase)
+                    r'(?:^|\n)\s*\(?([a-e])\)?[\.\)]\s*(.*?)(?=(?:\n\s*\(?[a-e]\)?[\.\)]|\Z))',
                 ]
-            })
-
+                
+                options = []
+                for opt_pattern in option_patterns:
+                    opt_matches = re.findall(opt_pattern, block, re.DOTALL | re.IGNORECASE)
+                    if opt_matches and len(opt_matches) >= 2:
+                        for label, opt_text in opt_matches:
+                            clean_text = opt_text.strip().replace('\n', ' ')
+                            if clean_text:
+                                options.append({
+                                    "label": label.upper(),
+                                    "text": clean_text
+                                })
+                        break
+                
+                if not options:
+                    continue
+                
+                # Extract question text (everything before the first option)
+                first_opt = re.search(r'\(?[A-Ea-e]\)?[\.\)]', block, re.IGNORECASE)
+                q_text = block[:first_opt.start()].strip() if first_opt else block.strip()
+                q_text = re.sub(r'\s+', ' ', q_text).strip()
+                
+                if q_text and len(options) >= 2:
+                    questions.append({
+                        "question_text": q_text,
+                        "choices": [
+                            {
+                                "choice_text": o["text"],
+                                "is_correct": (o["label"] == correct_answer)
+                            }
+                            for o in options
+                        ]
+                    })
+            
+            if questions:
+                break  # Stop if we found questions with this pattern
+    
     return questions
-
-@exam_router.post("/extract-answers")
-async def extract_exam_answers(file: UploadFile = File(...)):
-    contents = await file.read()
-    text = ""
-    
-    if file.filename.endswith(".pdf"):
-        reader = PyPDF2.PdfReader(io.BytesIO(contents))
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
-    elif file.filename.endswith(".docx"):
-        doc = docx.Document(io.BytesIO(contents))
-        text_parts = []
-        for para in doc.paragraphs:
-            text_parts.append(para.text)
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = "  ".join([cell.text.strip() for cell in row.cells])
-                text_parts.append(row_text)
-        text = "\n".join(text_parts)
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported format")
-
-    answers = {}
-    pattern = re.compile(r'(?:^|\n|\s)(?:Q|Question\s*)?(\d+)\s*[\.\-\:\)]?\s*(?:\()?([A-Ea-e])(?:\)|\.)?(?=\s|$|\n)', re.IGNORECASE)
-    matches = pattern.findall(text)
-    for q_num, ans in matches:
-        answers[str(int(q_num))] = ans.upper()
-    
-    return answers
 
 @exam_router.delete("/{exam_id}")
 async def delete_exam(exam_id: int):
