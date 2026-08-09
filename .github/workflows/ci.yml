@@ -15,9 +15,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # npm ci can omit Rolldown's Linux optional binding when the lockfile
-      # was generated on Windows. Let npm resolve platform-native optionals.
-      - run: npm install --include=optional
+      - run: npm ci
+      # npm ci may omit this native optional package when the lockfile was
+      # generated on Windows. Install the locked Linux binding explicitly.
+      - run: npm install --no-save --package-lock=false --include=optional @rolldown/binding-linux-x64-gnu@1.0.0-rc.15
       - run: npm run test:teacherbuddy
       - run: npm run test:edugames
       - run: npm run build -w @eduai/teacherbuddy
