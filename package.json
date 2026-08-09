@@ -11,7 +11,7 @@
     "dev": "npx concurrently \"npm run dev:admin\" \"npm run dev:interactive\"",
     "test:teacherbuddy": "npm run test -w @eduai/teacherbuddy",
     "test:edugames": "npm run test -w @eduai/edugames",
-    "test:backend": "python -m pytest -c backend/pytest.ini",
+    "test:backend": "python -m pytest -c backend/pytest.ini backend/tests",
     "test": "npm run test:teacherbuddy && npm run test:edugames && npm run test:backend"
   },
   "devDependencies": {
