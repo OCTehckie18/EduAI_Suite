@@ -1,0 +1,9 @@
+# Install the application dependencies and the backend test toolchain with:
+# python -m pip install -r backend/requirements-test.txt
+-r requirements.txt
+
+# Keep test infrastructure explicit even when it is also used by the app.
+pytest
+pytest-asyncio
+httpx
+mongomock-motor

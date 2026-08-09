@@ -15,7 +15,11 @@ This document outlines the testing strategy, setup, and current outcomes for the
 - Request Client: HTTPX
 - Database Mocking: Real MongoDB Database (Test Database defined by MONGODB_DB)
 
-## 2. Test Execution
+## 2. Test Installation and Execution
+
+Install backend test dependencies before running the suite:
+
+    python -m pip install -r backend/requirements-test.txt
 
 All tests are orchestrated from the root directory using concurrently.
 
