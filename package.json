@@ -9,7 +9,10 @@
     "dev:admin": "npm run dev -w @eduai/teacherbuddy -- --host",
     "dev:interactive": "npm run dev -w @eduai/edugames -- --host",
     "dev": "npx concurrently \"npm run dev:admin\" \"npm run dev:interactive\"",
-    "test": "npx concurrently \"npm run test -w @eduai/teacherbuddy\" \"npm run test -w @eduai/edugames\" \"cd backend && pytest\""
+    "test:teacherbuddy": "npm run test -w @eduai/teacherbuddy",
+    "test:edugames": "npm run test -w @eduai/edugames",
+    "test:backend": "python -m pytest -c backend/pytest.ini",
+    "test": "npm run test:teacherbuddy && npm run test:edugames && npm run test:backend"
   },
   "devDependencies": {
     "react": "^19.2.7",
