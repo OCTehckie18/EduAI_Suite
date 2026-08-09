@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, type DropResult, type DroppableProvided } from '@hello-pangea/dnd';
 import { ArrowLeft, Star, Plus, X, MoreHorizontal, Trash2, Pencil, Users } from 'lucide-react';
 import { useTrelloStore, type TrelloCard } from '../../store/useTrelloStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -201,7 +201,7 @@ export const TrelloBoardView: React.FC = () => {
       {/* Columns Area */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="board-columns" direction="horizontal" type="column">
-          {(provided) => (
+          {(provided: DroppableProvided) => (
             <div
               ref={provided.innerRef}
               {...provided.droppableProps}

@@ -111,7 +111,7 @@ export const StudentClassrooms: React.FC = () => {
     return storedUser ? JSON.parse(storedUser) : { name: "Student", email: "student@eduai.com" };
   };
 
-  const loadCourses = async () => {
+  const loadCourses = async (): Promise<Course[]> => {
     const user = get_user();
     const studentName = user.name;
     const response = await fetch(`${API_URL}/api/dashboard/student-summary?student_name=${encodeURIComponent(studentName)}`);
@@ -120,7 +120,7 @@ export const StudentClassrooms: React.FC = () => {
     }
 
     const data = await response.json();
-    const coursesList = data.courses || [];
+    const coursesList = (data.courses || []) as Course[];
     setCourses(coursesList);
     return coursesList;
   };
@@ -140,16 +140,17 @@ export const StudentClassrooms: React.FC = () => {
     setAnnouncements(Array.isArray(announcementData) ? announcementData.sort((a: any, b: any) => b.id - a.id) : []);
     
     if (Array.isArray(assignmentData)) {
-      assignmentData.sort((a: any, b: any) => b.id - a.id);
-      setAssignments(assignmentData);
-      const submissionsPromises = assignmentData.map(a => 
+      const assignmentsList = [...assignmentData] as Assignment[];
+      assignmentsList.sort((a, b) => b.id - a.id);
+      setAssignments(assignmentsList);
+      const submissionsPromises = assignmentsList.map((a) =>
          fetch(`${API_URL}/submissions/${a.id}`).then(res => res.json().catch(() => []))
       );
       const allSubmissions = await Promise.all(submissionsPromises);
-      const submittedIds = [];
+      const submittedIds: number[] = [];
       const user = get_user();
       const studentName = user.name;
-      assignmentData.forEach((a, i) => {
+      assignmentsList.forEach((a, i) => {
          if (Array.isArray(allSubmissions[i]) && allSubmissions[i].some((sub: any) => sub.student_name === studentName)) {
             submittedIds.push(a.id);
          }
