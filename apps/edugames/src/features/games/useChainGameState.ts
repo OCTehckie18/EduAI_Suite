@@ -53,7 +53,14 @@ export const useChainGameState = (): [ChainGameState, ChainGameActions] => {
     errorMessage: "",
   });
 
-  const initializeGame = useCallback((sessionId: string, config) => {
+  const initializeGame = useCallback((sessionId: string, config: {
+    name: string;
+    chainVariation: ChainVariation;
+    category?: string;
+    difficulty: "easy" | "medium" | "hard";
+    language: string;
+    startingWord: string;
+  }) => {
     setState((prev) => ({
       ...prev,
       session: {

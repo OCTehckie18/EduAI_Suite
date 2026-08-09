@@ -56,8 +56,8 @@ export const StudentShell: React.FC = () => {
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {studentNavItems.map((item) => (
-            <NavLink key={item.href} to={item.href} end={item.end} className={({ isActive }) => `nav-item ${isActive ? "nav-item-active" : ""}`}>
-              {({ isActive }) => (
+            <NavLink key={item.href} to={item.href} end={item.end} className={({ isActive }: { isActive: boolean }) => `nav-item ${isActive ? "nav-item-active" : ""}`}>
+              {({ isActive }: { isActive: boolean }) => (
                 <>
                   <span className={`shrink-0 transition-all ${isActive ? "text-white" : "text-white/55"}`}>
                     <item.icon size={19} />

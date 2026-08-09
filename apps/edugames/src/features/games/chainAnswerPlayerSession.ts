@@ -53,6 +53,7 @@ export const saveChainAnswerPlayerSession = (
 };
 
 export const getOrCreateChainAnswerPlayerSession = (
+  gameId: number,
   sessionId: string,
   playerName: string,
 ) => {
@@ -61,8 +62,8 @@ export const getOrCreateChainAnswerPlayerSession = (
   if (existing && existing.sessionId === sessionId) {
     return existing.playerName.trim() === playerName.trim()
       ? existing
-      : saveChainAnswerPlayerSession(sessionId, playerName, existing.playerId);
+      : saveChainAnswerPlayerSession(gameId, sessionId, playerName, existing.playerId);
   }
 
-  return saveChainAnswerPlayerSession(sessionId, playerName);
+  return saveChainAnswerPlayerSession(gameId, sessionId, playerName);
 };

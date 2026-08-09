@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Draggable, Droppable } from '@hello-pangea/dnd';
+import { Draggable, Droppable, type DroppableProvided, type DroppableStateSnapshot } from '@hello-pangea/dnd';
 import { MoreHorizontal, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { useTrelloStore, type TrelloCard, type TrelloColumn } from '../../../store/useTrelloStore';
 import { BoardCard } from './BoardCard';
@@ -113,7 +113,7 @@ export const BoardColumn: React.FC<Props> = ({ column, cards, index, onCardClick
 
           {/* Cards Droppable Area */}
           <Droppable droppableId={column.id} type="card">
-            {(dropProvided, dropSnapshot) => (
+            {(dropProvided: DroppableProvided, dropSnapshot: DroppableStateSnapshot) => (
               <div
                 ref={dropProvided.innerRef}
                 {...dropProvided.droppableProps}
