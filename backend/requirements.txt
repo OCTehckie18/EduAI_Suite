@@ -25,6 +25,7 @@ boto3>=1.26.0
 aiohttp
 nltk
 google-auth>=2.22.0
+requests
 pytest
 pytest-asyncio
 httpx
