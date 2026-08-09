@@ -1,134 +1,146 @@
-# 🎓 EduAI Suite
+# EduAI Suite
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![React](https://img.shields.io/badge/React-18-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green)
-![Python](https://img.shields.io/badge/Python-3.10+-yellow)
+![React](https://img.shields.io/badge/React-19-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-green)
+![Python](https://img.shields.io/badge/Python-3.10%2B-yellow)
 
-EduAI Suite is a comprehensive, modern educational platform designed to bridge the gap between interactive learning and AI-powered teaching assistance. It consists of multiple interconnected applications that serve both educators and students through real-time engagement and generative AI.
+EduAI Suite is a monorepo for AI-assisted teaching, student learning, assessments, collaboration, and real-time classroom activities. It contains two React applications backed by a shared FastAPI service.
 
----
+## Applications
 
-## 🌟 Key Features
+- **TeacherBuddy** (`apps/teacherbuddy`) — teacher and administrator workspace for dashboards, courses, lessons, exams, analytics, reports, OMR processing, presentations, games, appointments, mail, and Trello-style planning.
+- **EduGames** (`apps/edugames`) — student workspace for dashboards, classrooms, lessons, exams, live presentations, wellbeing, appointments, AI chat, games, and Trello-style planning.
+- **Backend API** (`backend`) — FastAPI application providing authentication, course and classroom workflows, lessons, exams, assignments, games, analytics, reports, OMR, storage, email, and WebSocket features.
 
-### 🤖 Auto Lesson Planner
-Powered by Groq and the Llama 3 model, the Auto Lesson Planner allows teachers to input a topic and syllabus context to instantly generate a comprehensive lesson plan. The AI generates the lecture flow, real-world examples, interactive activities, and quiz questions, which can then be directly posted to students.
+The main product apps communicate with the backend through the `/api` proxy. The Vite development servers also proxy WebSocket traffic to the backend.
 
-### 📊 EduSlido (Live Presentations & Polling)
-A real-time presentation and polling system. Teachers can assign PPTX submissions, grade them, and run live interactive sessions using WebSockets. During a session, students can participate in live polls, submit Q&A questions, and upvote their peers' questions while the teacher navigates through slides.
-
-### 🎮 Educational Games Hub
-Features collaborative learning games like the **Chain Answer Game**. Students take turns creating word chains based on configurable rules (Standard, Category, Ladder, etc.) in a real-time multiplayer environment.
-
----
-
-## 🏗️ System Architecture
-
-EduAI Suite is built as a monorepo utilizing npm workspaces and is composed of three main layers:
-
-### 1. Frontend Layer (React & TypeScript)
-- **TeacherBuddy (`apps/teacherbuddy`)**: The dedicated portal for educators. Allows teachers to use AI tools, create lessons, manage game sessions, assign presentation tasks, and grade student submissions.
-- **EduGames (`apps/edugames`)**: The interactive portal for students. Here, students can view posted lessons, submit assignments, participate in live presentation sessions, and play educational multiplayer games.
-
-### 2. Backend API Layer (FastAPI)
-The central nervous system of the platform, built with Python and FastAPI.
-- **RESTful Endpoints**: Manages lessons, users, games, and presentation assignments.
-- **WebSocket Server**: Powers real-time polling, Q&A boards, and live game states.
-- **AI Integration**: Interfaces directly with the Groq Cloud API for all generative AI tasks.
-
-### 3. Persistence & Storage Layer
-- **Database**: Uses modern ORMs (SQLAlchemy/Beanie) to support both SQL (SQLite/PostgreSQL) and NoSQL (MongoDB) paradigms for different services.
-- **Storage**: Integrates with S3/MinIO for secure handling of presentation uploads and static assets.
-
----
-
-## 📁 Project Structure
+## Current structure
 
 ```text
 EduAI_Suite/
 ├── apps/
-│   ├── teacherbuddy/      # React/TS App for Educators
-│   └── edugames/          # React/TS App for Students
-├── backend/               # FastAPI Python Server
+│   ├── teacherbuddy/          # React + TypeScript teacher/admin app
+│   │   └── src/
+│   │       ├── features/      # Product features
+│   │       ├── layouts/        # Application shells
+│   │       ├── router/         # Route configuration
+│   │       ├── shared/         # Reusable UI, hooks, and utilities
+│   │       └── store/          # Client state
+│   └── edugames/              # React + TypeScript student app
+│       └── src/               # Same feature-oriented layout as TeacherBuddy
+├── backend/
 │   ├── app/
-│   │   ├── models/        # Database models
-│   │   ├── routes/        # API and WebSocket routes
-│   │   ├── schemas/       # Pydantic validation models
-│   │   └── services/      # Business logic & AI integration
-│   ├── requirements.txt   # Python dependencies
-│   └── main.py            # Entry point
-└── package.json           # Root workspace configuration
+│   │   ├── models/            # Persistence models
+│   │   ├── routes/             # REST and WebSocket routes
+│   │   ├── schemas/            # Pydantic schemas
+│   │   ├── services/           # AI, storage, document, and domain services
+│   │   └── utils/              # Authentication and file utilities
+│   ├── tests/                 # Backend tests
+│   ├── requirements.txt
+│   ├── requirements-test.txt
+│   └── pytest.ini
+├── .github/workflows/ci.yml   # Frontend and backend CI
+├── docker-compose.minio.yml   # Optional local MinIO storage
+├── TESTING_README.md          # Detailed testing notes
+└── package.json               # npm workspace and root scripts
 ```
 
----
+## Technology
 
-## 🚀 Getting Started
+- React, TypeScript, Vite, React Router, Tailwind CSS, Zustand, TanStack Query, Framer Motion, and Vitest for the frontend.
+- Python, FastAPI, Uvicorn, Pydantic, Motor/Beanie, and Pytest for the backend.
+- MongoDB is used by the backend persistence layer. MinIO or S3 can be used for uploaded files and generated assets.
+- Groq is used for AI-powered features. Google OAuth and SMTP integrations are configured through environment variables.
 
-### Prerequisites
-- **Node.js** (v18 or higher)
-- **Python** (v3.10 or higher)
-- **Groq API Key** (for AI features)
-- **MinIO/S3** (optional, for local storage development)
+## Prerequisites
 
-### Installation
+- Node.js 22 (the CI workflow uses Node 22)
+- Python 3.10 or newer
+- MongoDB for backend development and tests
+- A Groq API key for AI features
+- Optional: MinIO/S3, Google OAuth credentials, and SMTP credentials
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd EduAI_Suite
-   ```
+## Setup
 
-2. **Install Node dependencies:**
-   ```bash
-   npm install
-   ```
+Clone the repository and install the frontend dependencies:
 
-3. **Set up the Backend environment:**
-   ```bash
-   cd backend
-   python -m venv venv
-   # Windows: venv\Scripts\activate | Mac/Linux: source venv/bin/activate
-   pip install -r requirements.txt
-   ```
+```bash
+git clone <repository-url>
+cd EduAI_Suite
+npm install
+```
 
-4. **Configure Environment Variables:**
-   - In the `backend` directory, copy `.env.example` to `.env`:
-     ```bash
-     cp .env.example .env
-     ```
-   - Add your `GROQ_API_KEY` to the `.env` file.
+Create and activate a Python virtual environment, then install the backend dependencies:
 
-### Running the Application
+```bash
+cd backend
+python -m venv venv
+# Windows PowerShell:
+.\venv\Scripts\Activate.ps1
+# macOS/Linux:
+# source venv/bin/activate
+python -m pip install -r requirements.txt
+cd ..
+```
 
-**1. Start the Frontend Apps (TeacherBuddy & EduGames)**
-From the root directory, you can start both frontend applications concurrently:
+Copy the environment template and fill in the values needed for your setup:
+
+```bash
+Copy-Item backend/.env.example backend/.env       # Windows PowerShell
+# cp backend/.env.example backend/.env             # macOS/Linux
+```
+
+At minimum, configure `GROQ_API_KEY`. The template also documents MongoDB, MinIO/S3, Google OAuth, SMTP, teacher-domain, and admin-email settings used by the backend.
+
+## Run locally
+
+Start both frontend applications from the repository root:
+
 ```bash
 npm run dev
 ```
-- TeacherBuddy runs on `http://localhost:5173` (default)
-- EduGames runs on `http://localhost:5174` (default)
 
-**2. Start the Backend API**
-Open a new terminal, activate your python environment, and run:
+- TeacherBuddy: <http://localhost:5173>
+- EduGames: <http://localhost:5174>
+
+Start the backend in a separate terminal with the virtual environment activated:
+
 ```bash
 cd backend
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-- The API will be available at `http://localhost:8000`
-- Swagger UI Documentation is available at `http://localhost:8000/docs`
 
----
+- API: <http://localhost:8000>
+- Swagger UI: <http://localhost:8000/docs>
 
-## 🧪 Testing
+To run local object storage, use `docker-compose.minio.yml` and keep `USE_S3=false` with the MinIO settings from `backend/.env.example`.
 
-The platform includes comprehensive testing suites for both the frontend components and backend API.
+## Commands
 
-- **Backend:** Run Pytest for endpoint, service, and database persistence tests.
-- **Frontend:** Component testing using standard React testing utilities.
+Run these from the repository root:
 
----
+```bash
+npm run dev                 # Start TeacherBuddy and EduGames together
+npm run dev:admin           # Start TeacherBuddy only
+npm run dev:interactive     # Start EduGames only
+npm run test                # Run frontend and backend tests
+npm run test:teacherbuddy   # TeacherBuddy Vitest suite
+npm run test:edugames       # EduGames Vitest suite
+npm run test:backend        # Backend Pytest suite
+```
 
-## 📄 License
+Each frontend also provides `build`, `lint`, and `preview` scripts through its workspace package. For backend test setup, install `backend/requirements-test.txt` when required:
+
+```bash
+python -m pip install -r backend/requirements-test.txt
+```
+
+## Continuous integration
+
+GitHub Actions runs the TeacherBuddy and EduGames test/build checks plus the backend Pytest suite. The backend CI job starts MongoDB 7 as a service. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) for the exact workflow.
+
+## License
 
 This project is licensed under the MIT License.

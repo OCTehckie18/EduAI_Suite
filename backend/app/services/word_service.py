@@ -37,9 +37,9 @@ try:
     from nltk.corpus import words as _nltk_words
     _all_english_words = set(w.lower() for w in _nltk_words.words())
     _nltk_ready = True
-    logger.info("✅ WordService: nltk corpora loaded successfully")
+    logger.info(" WordService: nltk corpora loaded successfully")
 except Exception as e:
-    logger.warning(f"⚠️  WordService: nltk not available, using fallback word bank: {e}")
+    logger.warning(f"️  WordService: nltk not available, using fallback word bank: {e}")
     _all_english_words = set()
 
 # ── Fallback Static Word Bank ─────────────────────────────────

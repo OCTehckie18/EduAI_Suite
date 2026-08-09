@@ -160,7 +160,7 @@ export const ChainAnswerGameCreation: React.FC<
             className="text-3xl font-bold mb-4 font-display"
             style={{ color: "var(--color-text-primary)" }}
           >
-            Game Created Successfully! 🎉
+            Game Created Successfully
           </h2>
           <p
             style={{ color: "var(--color-text-secondary)" }}
@@ -554,7 +554,7 @@ export const ChainAnswerGameCreation: React.FC<
                   style={{ color: "var(--color-text-secondary)" }}
                   className="text-xs mt-2"
                 >
-                  💡 Providing a subject filters word suggestions to match the
+                  Note: Providing a subject filters word suggestions to match the
                   topic
                 </p>
               </div>
@@ -688,7 +688,7 @@ export const ChainAnswerGameCreation: React.FC<
                 className="text-sm mt-2"
                 style={{ color: "var(--color-text-secondary)" }}
               >
-                ⚠️ Select at least 2 players to start the game
+                Select at least 2 players to start the game
               </p>
             )}
           </GlassCard>
@@ -705,7 +705,7 @@ export const ChainAnswerGameCreation: React.FC<
                 style={{ color: "var(--color-error)" }}
                 className="font-semibold"
               >
-                ❌ {error}
+                {error}
               </p>
             </motion.div>
           )}

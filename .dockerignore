@@ -1,0 +1,13 @@
+.git
+.github
+.codebase-memory
+node_modules
+**/node_modules
+**/.pytest_cache
+**/__pycache__
+**/dist
+**/.env
+backend/uploads
+backend/local_uploads
+backend/*.db
+*.log

@@ -498,7 +498,7 @@ export const ChainGameBoard: React.FC<ChainGameBoardProps> = ({
                         : "var(--color-text-secondary)",
                   }}
                 >
-                  {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}`}
+                  {index === 0 ? "" : index === 1 ? "" : index === 2 ? "" : `${index + 1}`}
                 </span>
                 <span
                   className="font-semibold flex-1 ml-3"

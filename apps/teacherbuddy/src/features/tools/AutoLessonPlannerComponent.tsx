@@ -97,7 +97,7 @@ export const AutoLessonPlannerComponent: React.FC<{ courseId?: number }> = ({
         {
           type: "ai",
           content:
-            "✅ Lesson plan generated successfully! Review the content below and click 'Post to Students' to share it with your class.",
+            "Lesson plan generated successfully. Review the content below and click 'Post to Students' to share it with your class.",
         },
       ]);
 
@@ -110,7 +110,7 @@ export const AutoLessonPlannerComponent: React.FC<{ courseId?: number }> = ({
         ...prev,
         {
           type: "ai",
-          content: `❌ Error: ${errorMessage}`,
+          content: `Error: ${errorMessage}`,
         },
       ]);
     } finally {
@@ -148,7 +148,7 @@ export const AutoLessonPlannerComponent: React.FC<{ courseId?: number }> = ({
         ...prev,
         { 
           type: "ai", 
-          content: `📄 Course plan processed! ${result.topic ? `Detected topic: "${result.topic}"` : "Please confirm the topic below."}` 
+          content: `Course plan processed. ${result.topic ? `Detected topic: "${result.topic}"` : "Please confirm the topic below."}` 
         }
       ]);
     } catch (err) {
@@ -211,7 +211,7 @@ export const AutoLessonPlannerComponent: React.FC<{ courseId?: number }> = ({
         {
           type: "ai",
           content:
-            "🎉 Lesson posted successfully! Your students can now see this in their dashboard.",
+            "Lesson posted successfully. Your students can now see this in their dashboard.",
         },
       ]);
     } catch (err) {
@@ -222,7 +222,7 @@ export const AutoLessonPlannerComponent: React.FC<{ courseId?: number }> = ({
         ...prev,
         {
           type: "ai",
-          content: `❌ Error posting: ${errorMessage}`,
+          content: `Error posting: ${errorMessage}`,
         },
       ]);
     } finally {

@@ -147,7 +147,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
               : q.choices
         }));
         setQuestions([...questions, ...formatted]);
-        setImportSuccess(`✅ Successfully imported ${formatted.length} questions with AI`);
+        setImportSuccess(` Successfully imported ${formatted.length} questions with AI`);
       } else {
         setError("No questions could be extracted from this document. Try a clearer format or use Excel import.");
       }
@@ -220,7 +220,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({ onClose, onSave, initi
         }));
         setQuestions([...questions, ...formatted]);
         
-        let msg = `✅ Successfully imported ${data.imported_count} questions`;
+        let msg = ` Successfully imported ${data.imported_count} questions`;
         if (data.errors && data.errors.length > 0) {
           msg += ` (${data.errors.length} row(s) skipped)`;
         }

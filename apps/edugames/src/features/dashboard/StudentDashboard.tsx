@@ -146,7 +146,7 @@ export const StudentDashboard: React.FC = () => {
             className="text-2xl font-bold font-display"
             style={{ color: "var(--color-text-primary)" }}
           >
-            Welcome back, {studentName.split(" ")[0]} 👋
+            Welcome back, {studentName.split(" ")[0]}
           </h1>
           <p
             className="text-sm mt-1"
@@ -230,7 +230,7 @@ export const StudentDashboard: React.FC = () => {
             <div>
               <h3 className="section-title text-sm mb-3 flex items-center gap-2">
                 <Lightbulb size={16} className="text-yellow-500" />
-                📚 New Lesson Plans from Your Teachers
+                New Lesson Plans from Your Teachers
               </h3>
               <div className="space-y-3">
                 {visibleLessons.map((lesson) => (
@@ -286,7 +286,7 @@ export const StudentDashboard: React.FC = () => {
             <GlassCard className="p-5">
               <h3 className="section-title text-sm mb-2 flex items-center gap-2">
                 <Lightbulb size={16} className="text-yellow-500" />
-                📚 New Lesson Plans from Your Teachers
+                New Lesson Plans from Your Teachers
               </h3>
               <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
                 No posted lessons are available yet.

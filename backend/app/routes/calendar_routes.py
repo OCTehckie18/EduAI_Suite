@@ -145,7 +145,7 @@ async def get_calendar_events(
         events.append({
             "id": f"assignment-{assg.int_id}",
             "raw_id": assg.int_id,
-            "title": f"📝 Due: {assg.title}",
+            "title": f" Due: {assg.title}",
             "description": assg.description or "",
             "start": dt.isoformat(),
             "end": (dt + timedelta(hours=1)).isoformat(),
@@ -175,7 +175,7 @@ async def get_calendar_events(
         events.append({
             "id": f"exam-{exam.int_id}",
             "raw_id": exam.int_id,
-            "title": f"📋 Exam: {exam.title}",
+            "title": f" Exam: {exam.title}",
             "description": exam.description or "",
             "start": dt.isoformat(),
             "end": (dt + timedelta(minutes=exam.time_limit or 60)).isoformat(),
@@ -213,7 +213,7 @@ async def get_calendar_events(
         events.append({
             "id": f"appointment-{appt.int_id}",
             "raw_id": appt.int_id,
-            "title": f"👤 {appt.student_name}: {appt.agenda}",
+            "title": f" {appt.student_name}: {appt.agenda}",
             "description": f"Mode: {appt.meeting_mode} | Booked for: {appt.time_slot}",
             "start": dt.isoformat(),
             "end": (dt + timedelta(minutes=30)).isoformat(),
@@ -244,7 +244,7 @@ async def get_calendar_events(
         events.append({
             "id": f"lesson-{lesson.int_id}",
             "raw_id": lesson.int_id,
-            "title": f"📖 {lesson.title or lesson.topic}",
+            "title": f" {lesson.title or lesson.topic}",
             "description": lesson.topic,
             "start": dt.isoformat(),
             "end": (dt + timedelta(hours=1)).isoformat(),
@@ -401,7 +401,7 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
             "type": ev.event_type,
             "color": ev.color,
             "source": "custom",
-            "message": f"📅 Tomorrow: {ev.title} at {ev.start_time.strftime('%I:%M %p')}",
+            "message": f" Tomorrow: {ev.title} at {ev.start_time.strftime('%I:%M %p')}",
         })
 
     # Assignment deadlines tomorrow
@@ -419,12 +419,12 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
                 continue
             notifications.append({
                 "id": f"assignment-{assg.int_id}",
-                "title": f"📝 Due: {assg.title}",
+                "title": f" Due: {assg.title}",
                 "start": dt.isoformat(),
                 "type": "deadline",
                 "color": "#d97706",
                 "source": "assignment",
-                "message": f"📝 Assignment \"{assg.title}\" is due tomorrow" + (f" ({course.name})" if course else ""),
+                "message": f" Assignment \"{assg.title}\" is due tomorrow" + (f" ({course.name})" if course else ""),
             })
 
     # Exams tomorrow
@@ -439,12 +439,12 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
                 continue
             notifications.append({
                 "id": f"exam-{exam.int_id}",
-                "title": f"📋 Exam: {exam.title}",
+                "title": f" Exam: {exam.title}",
                 "start": dt.isoformat(),
                 "type": "exam",
                 "color": "#dc2626",
                 "source": "exam",
-                "message": f"📋 Exam \"{exam.title}\" is scheduled for tomorrow" + (f" ({course.name})" if course else ""),
+                "message": f" Exam \"{exam.title}\" is scheduled for tomorrow" + (f" ({course.name})" if course else ""),
             })
 
     # Appointments tomorrow
@@ -463,12 +463,12 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
                 continue
             notifications.append({
                 "id": f"appointment-{appt.int_id}",
-                "title": f"👤 {appt.student_name}: {appt.agenda}",
+                "title": f" {appt.student_name}: {appt.agenda}",
                 "start": dt.isoformat(),
                 "type": "appointment",
                 "color": "#16a34a",
                 "source": "appointment",
-                "message": f"👤 Meeting with {appt.student_name} about \"{appt.agenda}\" tomorrow",
+                "message": f" Meeting with {appt.student_name} about \"{appt.agenda}\" tomorrow",
             })
 
     # Lessons tomorrow
@@ -483,12 +483,12 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
                 continue
             notifications.append({
                 "id": f"lesson-{lesson.int_id}",
-                "title": f"📖 {lesson.title or lesson.topic}",
+                "title": f" {lesson.title or lesson.topic}",
                 "start": dt.isoformat(),
                 "type": "class",
                 "color": "#7c3aed",
                 "source": "lesson",
-                "message": f"📖 Lesson \"{lesson.title or lesson.topic}\" is scheduled for tomorrow" + (f" ({course.name})" if course else ""),
+                "message": f" Lesson \"{lesson.title or lesson.topic}\" is scheduled for tomorrow" + (f" ({course.name})" if course else ""),
             })
 
     notifications.sort(key=lambda n: n["start"])

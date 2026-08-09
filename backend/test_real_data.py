@@ -16,12 +16,12 @@ def test_get_active_students():
     response = requests.get(f"{BASE_URL}/students/1/active")
     if response.status_code == 200:
         students = response.json()
-        print(f"✓ Successfully fetched {len(students)} active students")
+        print(f" Successfully fetched {len(students)} active students")
         if students:
             print(f"  Sample: {students[0]['name']} (ID: {students[0]['id']})")
         return students
     else:
-        print(f"✗ Failed: {response.status_code}")
+        print(f" Failed: {response.status_code}")
         print(f"  {response.text}")
         return []
 
@@ -29,7 +29,7 @@ def test_get_active_students():
 def test_create_game_with_real_students(students):
     """Test creating a game with real student IDs"""
     if len(students) < 2:
-        print("\n✗ Need at least 2 students to test game creation")
+        print("\n Need at least 2 students to test game creation")
         return None
 
     print("\n=== Testing POST /games/chain-answer with real students ===")
@@ -61,7 +61,7 @@ def test_create_game_with_real_students(students):
 
     if response.status_code == 201:
         game = response.json()
-        print(f"✓ Game created successfully")
+        print(f" Game created successfully")
         print(f"  Session ID: {game['session_id']}")
         print(f"  Players: {len(game['players'])}")
         for player in game['players']:
@@ -69,7 +69,7 @@ def test_create_game_with_real_students(students):
                 f"    - {player['name']} (Student ID: {player['student_id']})")
         return game
     else:
-        print(f"✗ Failed: {response.status_code}")
+        print(f" Failed: {response.status_code}")
         print(f"  {response.text}")
         return None
 
@@ -85,11 +85,11 @@ def main():
     if students and len(students) >= 2:
         game = test_create_game_with_real_students(students)
         if game:
-            print("\n✓ All tests passed!")
+            print("\n All tests passed!")
         else:
-            print("\n✗ Game creation test failed")
+            print("\n Game creation test failed")
     else:
-        print("\n⚠ Skipping game creation test (need at least 2 active students)")
+        print("\n Skipping game creation test (need at least 2 active students)")
 
     print("\n" + "=" * 50)
     print("Test complete. Check output above for any failures.")

@@ -147,7 +147,7 @@ export const QuizController: React.FC = () => {
   if (status === 'waiting') {
     return (
       <div className="min-h-screen bg-[#46178f] flex flex-col items-center justify-center p-6 text-white text-center animate-pulse">
-        <span className="text-9xl mb-8 animate-bounce">{avatar || "🎮"}</span>
+        <span className="text-4xl mb-8 font-semibold tracking-wide">{avatar || "PLAYER"}</span>
         <h2 className="text-5xl font-black mb-4 italic tracking-tighter">You're in!</h2>
         <p className="text-2xl font-bold opacity-60">See your name on screen, {nickname}?</p>
       </div>

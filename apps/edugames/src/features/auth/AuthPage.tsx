@@ -104,15 +104,15 @@ export const AuthPage: React.FC = () => {
         {/* Feature Highlights */}
         <div className="space-y-4 relative">
           {[
-            { emoji: "🎮", title: "Play & Learn", desc: "Master subjects through interactive mini-games" },
-            { emoji: "🏆", title: "Leaderboards", desc: "Compete locally and earn reward badges" },
-            { emoji: "🎯", title: "Smart Quizzes", desc: "Adaptive challenges that adjust to your skill" },
-            { emoji: "💚", title: "Wellbeing Zone", desc: "Breathing, focus timer, and guided relaxation" },
+            { mark: "PL", title: "Play & Learn", desc: "Master subjects through interactive mini-games" },
+            { mark: "LB", title: "Leaderboards", desc: "Compete locally and earn reward badges" },
+            { mark: "SQ", title: "Smart Quizzes", desc: "Adaptive challenges that adjust to your skill" },
+            { mark: "WZ", title: "Wellbeing Zone", desc: "Breathing, focus timer, and guided relaxation" },
           ].map(f => (
             <div key={f.title} className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base"
                 style={{ background: "rgba(255,255,255,0.08)" }}>
-                {f.emoji}
+                {f.mark}
               </div>
               <div>
                 <p className="text-white font-semibold text-sm">{f.title}</p>
@@ -198,7 +198,7 @@ export const AuthPage: React.FC = () => {
                         onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-brand-blue)"; e.currentTarget.style.background = "rgba(38,71,150,0.03)"; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.background = "var(--color-surface-base)"; }}
                       >
-                        <span>🎓 Sign in as Demo Student</span>
+                        <span>Sign in as Demo Student</span>
                         <span className="text-[10px] text-slate-400 font-mono">student@christuniversity.in</span>
                       </button>
                     </div>

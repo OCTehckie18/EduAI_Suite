@@ -531,7 +531,7 @@ export const ChainAnswerGamePage: React.FC = () => {
                           }}
                           className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
                         >
-                          ✕
+                          
                         </button>
                       )}
                     </div>
@@ -677,7 +677,7 @@ export const ChainAnswerGamePage: React.FC = () => {
     console.error("ChainAnswerGamePage Error:", error);
     return (
       <div style={{ color: "red", padding: "20px", fontSize: "16px" }}>
-        <h2>❌ Error Loading Chain Answer Game</h2>
+        <h2>Error Loading Chain Answer Game</h2>
         <p>{String(error)}</p>
       </div>
     );

@@ -457,7 +457,7 @@ const PresenterView: React.FC<Props> = ({ submissionId, fileUrl, fileName, onBac
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-blue-300">
-                      🎯 Interaction Ready — Slide {pendingInteraction.slide_number}
+                      Interaction Ready — Slide {pendingInteraction.slide_number}
                     </span>
                     <span
                       className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
