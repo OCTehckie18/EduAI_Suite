@@ -10,9 +10,9 @@ Move authentication and file storage to Supabase while keeping MongoDB as the ge
 
 - MongoDB/Beanie remains responsible for application data, including academic records, games, sessions, reports, and counters.
 - Supabase Auth replaces the custom password/JWT issuer; MongoDB remains the profile/role/approval store and the API continues to enforce roles, approval state, and inactivity rules.
-- Supabase Storage replaces local `/uploads`, MinIO, and the S3/AWS production path.
+- Supabase Storage becomes the only file-storage provider, replacing local `/uploads`, MinIO, and AWS S3.
 - WebSocket game flows remain API-owned and continue to use MongoDB for durable state. Supabase Realtime is out of scope for this migration.
-- Local development uses MongoDB plus a local storage adapter; production uses MongoDB Atlas plus Supabase Auth/Storage and has no local-disk persistence.
+- Every environment uses Supabase Auth/Storage for identity and files; only MongoDB is environment-specific for general application data. No local-disk, MinIO, or AWS S3 fallback is permitted.
 
 ## Free-tier guardrails
 
@@ -34,7 +34,7 @@ The backend currently initializes Motor/Beanie against MongoDB in `backend/app/d
 File persistence currently has three paths that must be unified:
 
 - `backend/app/utils/file_uploads.py` writes directly to `backend/uploads` and returns `/uploads/...` URLs.
-- `backend/app/services/storage_service.py` uses MinIO locally or AWS S3 when configured, with a local `local_uploads` fallback.
+- `backend/app/services/storage_service.py` currently uses MinIO locally or AWS S3 when configured, with a local `local_uploads` fallback; all of these paths are scheduled for removal.
 - `omr_routes.py`, `report_routes.py`, and other routes construct `/uploads/...` paths directly.
 
 The main realtime surfaces are quiz, word cloud, Slido, and chain-answer WebSockets in `backend/app/routes/websocket_routes.py`; the frontend game synchronization hook is `apps/edugames/src/features/games/useGameSync.ts`.
@@ -47,7 +47,7 @@ React apps
   v
 FastAPI routes/services
   | existing Beanie/Motor repositories
-  | storage adapter (Supabase Storage; local adapter in development)
+  | Supabase Storage adapter (all environments)
   v
 Supabase
   ├─ Auth: auth.users + JWT sessions
@@ -85,12 +85,12 @@ Exit criteria: inventory is complete, quota estimates fit within Free limits, an
 ### Phase 1 — provider boundaries
 
 - Keep the existing Beanie/Motor repository behavior for CRUD, pagination, filtering, transactions, and ID compatibility.
-- Add `backend/app/storage/` with `SupabaseStorageAdapter` and `LocalStorageAdapter`.
+- Add `backend/app/storage/` with a single `SupabaseStorageAdapter`; do not add a local, MinIO, or AWS implementation.
 - Add typed settings for Supabase URL, publishable key, service-role key, bucket names, file-size limits, and retention settings.
-- Replace direct filesystem writes and direct S3/MinIO calls behind the adapter, preserving current route response URLs during the transition.
+- Replace every direct filesystem write and direct S3/MinIO call with the Supabase adapter, preserving current route response contracts through an API URL resolver during the transition.
 - Add tests for path sanitization, content-type/extension validation, size limits, signed URL access, and failed-upload cleanup.
 
-Exit criteria: no route needs to know whether storage is local, MinIO, S3, or Supabase.
+Exit criteria: no route can select a storage provider; every upload/download/delete operation goes through Supabase Storage.
 
 ### Phase 2 — Supabase Auth and identity bridge
 
@@ -110,6 +110,7 @@ Exit criteria: a new user can authenticate through Supabase, receive the same AP
 - Make the API issue signed download URLs after authorization; never expose raw service-role URLs.
 - Move direct OMR/report file reads to an adapter that streams/downloads from Storage and deletes temporary objects on completion.
 - Replace frontend assumptions about static `/uploads` URLs with an API/storage URL helper.
+- Add a startup health check that fails closed when Supabase Storage credentials or required buckets are unavailable; do not silently fall back to disk.
 
 Exit criteria: all upload routes work against Supabase Storage, all download paths enforce authorization, and the backend container can run without writable persistent disk.
 
@@ -118,7 +119,7 @@ Exit criteria: all upload routes work against Supabase Storage, all download pat
 - Keep FastAPI WebSockets and MongoDB for existing game behavior.
 - Add MongoDB indexes, connection-pool sizing, query timeouts, pagination limits, and health checks.
 - Add a scheduled cleanup/usage job and an admin usage endpoint with alerts at 60%, 80%, and 95% of configured quotas.
-- Remove MinIO, AWS S3, local upload mounts, and direct filesystem paths only after a full rollback window. Keep MongoDB, Beanie, and Motor.
+- Remove `boto3`, MinIO services/images/volumes, AWS S3 settings, local upload mounts, `local_uploads`, `/uploads` static mounts, and all provider-selection flags. Keep MongoDB, Beanie, and Motor.
 
 Exit criteria: staging and production smoke tests pass, quota alarms are observable, and the rollback procedure is tested.
 
