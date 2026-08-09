@@ -18,6 +18,7 @@ class UserStatus(str, enum.Enum):
 
 class User(Document):
     int_id: int = 0
+    auth_user_id: Optional[str] = None  # Supabase auth.users.id when Supabase Auth is enabled
     name: Optional[str] = None
     email: str
     hashed_password: Optional[str] = None  # Nullable for Google OAuth users

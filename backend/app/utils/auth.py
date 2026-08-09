@@ -5,6 +5,8 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.models.user import User
+from app.services.supabase_auth import supabase_auth_verifier
+import os
 
 # Configuration
 SECRET_KEY = "EDUAI_SECRET_KEY_KEEP_IT_SAFE"
@@ -40,16 +42,28 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
+        if os.getenv("AUTH_PROVIDER", "legacy").lower() == "supabase":
+            payload = supabase_auth_verifier.verify(token)
+            auth_user_id = payload.get("sub")
+            email = payload.get("email")
+            user = await User.find_one(
+                User.auth_user_id == auth_user_id
+            ) if auth_user_id else None
+            if user is None and email:
+                user = await User.find_one(User.email == email)
+                if user is not None and not user.auth_user_id:
+                    user.auth_user_id = auth_user_id
+                    await user.save()
+        else:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            email: str = payload.get("sub")
+            if email is None:
+                raise credentials_exception
+            user = await User.find_one(User.email == email)
     except JWTError:
         raise credentials_exception
-    
-    user = await User.find_one(User.email == email)
+
     if user is None:
-        print(f"DEBUG AUTH: User not found for email: {email}")
         raise credentials_exception
 
     # Session timeout check (15 minutes = 900 seconds)

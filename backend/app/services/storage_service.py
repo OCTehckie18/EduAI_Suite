@@ -245,5 +245,9 @@ def get_storage_service() -> StorageService:
     """Get or initialize storage service"""
     global storage_service
     if storage_service is None:
-        storage_service = StorageService()
+        if os.getenv("STORAGE_PROVIDER", "local").lower() == "supabase":
+            from app.services.supabase_storage_service import SupabaseStorageService
+            storage_service = SupabaseStorageService()
+        else:
+            storage_service = StorageService()
     return storage_service
