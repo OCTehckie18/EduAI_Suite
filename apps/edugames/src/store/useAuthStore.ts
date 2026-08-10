@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { supabase } from '../lib/supabase';
 
 interface UserInfo {
   id?: number;
@@ -47,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
         });
       },
       logout: () => {
+        void supabase.auth.signOut();
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('lastActivity');

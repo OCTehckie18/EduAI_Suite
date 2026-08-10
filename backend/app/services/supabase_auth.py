@@ -28,6 +28,13 @@ class SupabaseAuthVerifier:
         return self._keys
 
     def verify(self, token: str) -> Dict[str, Any]:
+        # FastAPI imports route modules before main.py loads the .env file.
+        # Refresh configuration here so local dotenv and deployment env vars
+        # are both honored when the first request arrives.
+        self.url = os.getenv("SUPABASE_URL", self.url).rstrip("/")
+        self.issuer = os.getenv("SUPABASE_AUTH_ISSUER", f"{self.url}/auth/v1")
+        self.audience = os.getenv("SUPABASE_AUTH_AUDIENCE", self.audience)
+        self.jwks_url = os.getenv("SUPABASE_AUTH_JWKS_URL", f"{self.issuer}/.well-known/jwks.json")
         if not self.url:
             raise JWTError("SUPABASE_URL is not configured")
 

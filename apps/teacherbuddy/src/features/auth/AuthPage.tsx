@@ -3,6 +3,7 @@ import { Loader } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import logo from "../../assets/logo (5).png";
 import { useAuthStore } from "../../store/useAuthStore";
+import { supabase } from "../../lib/supabase";
 
 export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -25,10 +26,17 @@ export const AuthPage: React.FC = () => {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/google-login", {
+      const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: credential,
+      });
+      if (authError || !authData.session) {
+        throw authError || new Error("Supabase did not return a session");
+      }
+
+      const res = await fetch("/api/auth/supabase-sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
+        headers: { Authorization: `Bearer ${authData.session.access_token}` },
       });
 
       const data = await res.json();
@@ -42,7 +50,7 @@ export const AuthPage: React.FC = () => {
         }
 
         googleLogin(
-          data.access_token,
+          authData.session.access_token,
           data.user,
           data.status
         );

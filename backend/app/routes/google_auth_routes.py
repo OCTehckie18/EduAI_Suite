@@ -6,16 +6,19 @@ and returns a JWT with user status for the approval workflow.
 
 import os
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
 from app.models.user import User, UserStatus
 from app.schemas.user_schema import GoogleLoginRequest, GoogleToken
 from app.utils.auth import create_access_token
+from app.services.supabase_auth import supabase_auth_verifier
 from app.utils.role_detection import detect_role_from_email
 
 google_auth_router = APIRouter(prefix="/auth", tags=["auth"])
+supabase_bearer = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
@@ -123,4 +126,46 @@ async def google_login(body: GoogleLoginRequest):
             "status": user.status or "approved",
             "picture": user.picture,
         },
+    )
+
+
+@google_auth_router.post("/supabase-sync", response_model=GoogleToken)
+async def supabase_sync(token: str = Depends(supabase_bearer)):
+    """Provision the MongoDB profile for a user authenticated by Supabase Auth."""
+    try:
+        payload = supabase_auth_verifier.verify(token)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Supabase session") from exc
+
+    auth_user_id = payload.get("sub")
+    email = (payload.get("email") or "").lower()
+    if not auth_user_id or not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Supabase session has no user identity")
+
+    user = await User.find_one(User.auth_user_id == auth_user_id) or await User.find_one(User.email == email)
+    if user is None:
+        detected_role = detect_role_from_email(email)
+        if detected_role == "external":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only university accounts are allowed.")
+        user = User(
+            auth_user_id=auth_user_id,
+            name=payload.get("user_metadata", {}).get("full_name") or email.split("@")[0],
+            email=email,
+            role=detected_role,
+            status=UserStatus.APPROVED if detected_role == "admin" else UserStatus.PENDING,
+            picture=payload.get("user_metadata", {}).get("avatar_url"),
+        )
+        await user.assign_id()
+        await user.insert()
+    elif not user.auth_user_id:
+        user.auth_user_id = auth_user_id
+        await user.save()
+
+    user.last_active = datetime.utcnow()
+    await user.save()
+    return GoogleToken(
+        access_token=token,
+        token_type="bearer",
+        status=user.status or "approved",
+        user={"id": user.int_id, "name": user.name, "email": user.email, "role": user.role, "status": user.status, "picture": user.picture},
     )
