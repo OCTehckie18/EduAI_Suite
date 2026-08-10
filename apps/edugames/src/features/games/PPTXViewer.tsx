@@ -223,9 +223,9 @@ const PPTXViewer: React.FC<PPTXViewerProps> = ({
       {/* Info Bar */}
       <div className="bg-slate-800 border-t border-slate-700 px-4 py-2 text-xs text-slate-400 flex-shrink-0">
         {viewerType === "office" ? (
-          <span>✓ Powered by Microsoft Office Web Viewer</span>
+          <span> Powered by Microsoft Office Web Viewer</span>
         ) : (
-          <span>⚠ Using fallback viewer. Download for full features.</span>
+                      <span>Using fallback viewer. Download for full features.</span>
         )}
       </div>
     </div>

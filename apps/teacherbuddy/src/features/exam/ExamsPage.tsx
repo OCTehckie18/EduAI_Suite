@@ -251,7 +251,7 @@ export const ExamsPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
-            {getGreeting()}, {authUser?.name || "Professor"} 👋
+            {getGreeting()}, {authUser?.name || "Professor"}
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
             {getFormattedDate()} — Manage and track your examinations.

@@ -15,12 +15,12 @@ const breathingPatterns = [
 
 /* ─── Ambient Sounds ─────────────────────────────────── */
 const sounds = [
-  { id: "rain",   name: "Rain",       emoji: "🌧️", desc: "Gentle rainfall"     },
-  { id: "ocean",  name: "Ocean",      emoji: "🌊", desc: "Calming waves"        },
-  { id: "forest", name: "Forest",     emoji: "🌲", desc: "Birds & rustling"     },
-  { id: "white",  name: "White Noise",emoji: "☁️", desc: "Deep concentration"  },
-  { id: "cafe",   name: "Café",       emoji: "☕", desc: "Soft background hum"  },
-  { id: "fire",   name: "Fireplace",  emoji: "🔥", desc: "Cozy & warm"         },
+  { id: "rain",   name: "Rain",        mark: "RN", desc: "Gentle rainfall"     },
+  { id: "ocean",  name: "Ocean",       mark: "OC", desc: "Calming waves"        },
+  { id: "forest", name: "Forest",      mark: "FR", desc: "Birds & rustling"     },
+  { id: "white",  name: "White Noise", mark: "WN", desc: "Deep concentration"  },
+  { id: "cafe",   name: "Café",        mark: "CF", desc: "Soft background hum"  },
+  { id: "fire",   name: "Fireplace",   mark: "FP", desc: "Cozy & warm"         },
 ];
 
 /* ─── Focus Timer ────────────────────────────────────── */
@@ -32,11 +32,11 @@ const focusPresets = [
 
 /* ─── Mood Tracker ───────────────────────────────────── */
 const moods = [
-  { label: "Great",    emoji: "😄", color: "#16a34a" },
-  { label: "Good",     emoji: "🙂", color: "#264796" },
-  { label: "Neutral",  emoji: "😐", color: "#d0ae61" },
-  { label: "Tired",    emoji: "😴", color: "#7c3aed" },
-  { label: "Stressed", emoji: "😰", color: "#dc2626" },
+  { label: "Great",    mark: "G", color: "#16a34a" },
+  { label: "Good",     mark: "G", color: "#264796" },
+  { label: "Neutral",  mark: "N", color: "#d0ae61" },
+  { label: "Tired",    mark: "T", color: "#7c3aed" },
+  { label: "Stressed", mark: "S", color: "#dc2626" },
 ];
 
 /* ─── Affirmations ───────────────────────────────────── */
@@ -328,7 +328,7 @@ export const WellbeingPage: React.FC = () => {
                 }`}
                 style={activeSound === s.id ? { boxShadow: "0 8px 24px rgba(5,150,105,0.2)" } : {}}
               >
-                <div className="text-4xl mb-3">{s.emoji}</div>
+                <div className="text-2xl mb-3 font-semibold tracking-wide">{s.mark}</div>
                 {activeSound === s.id && (
                   <div className="flex justify-center gap-1 mb-2">
                     {[1,2,3].map(i => (
@@ -345,7 +345,7 @@ export const WellbeingPage: React.FC = () => {
             ))}
           </div>
           <div className="p-3 rounded-xl text-xs" style={{ background: "rgba(5,150,105,0.07)", border: "1px solid rgba(5,150,105,0.15)", color: "var(--color-text-secondary)" }}>
-            🎧 For best results, use headphones. Ambient sounds help mask distractions and improve focus.
+             For best results, use headphones. Ambient sounds help mask distractions and improve focus.
           </div>
         </div>
       )}
@@ -373,7 +373,7 @@ export const WellbeingPage: React.FC = () => {
               ))}
             </div>
             <GlassCard padding="sm" className="text-center">
-              <p className="text-4xl mb-1">🍅</p>
+              <p className="text-4xl mb-1"></p>
               <p className="font-bold text-lg" style={{ color: "var(--color-text-primary)" }}>{sessionsComplete}</p>
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Sessions completed today</p>
             </GlassCard>
@@ -447,7 +447,7 @@ export const WellbeingPage: React.FC = () => {
                   }`}
                   style={selectedMood === m.label ? { borderColor: m.color, boxShadow: `0 4px 16px ${m.color}25` } : {}}
                 >
-                  <span className="text-2xl">{m.emoji}</span>
+                  <span className="text-xl font-semibold">{m.mark}</span>
                   <span className="text-[11px] font-semibold" style={{ color: selectedMood === m.label ? m.color : "var(--color-text-muted)" }}>
                     {m.label}
                   </span>
@@ -473,7 +473,7 @@ export const WellbeingPage: React.FC = () => {
               <div className="mt-3 p-3 rounded-xl flex items-center gap-2 animate-fade-in"
                 style={{ background: "rgba(22,163,74,0.1)", border: "1px solid rgba(22,163,74,0.2)" }}>
                 <Check size={14} className="text-green-600" />
-                <p className="text-sm text-green-700 font-semibold">Mood logged! Keep taking care of yourself. 💙</p>
+                <p className="text-sm text-green-700 font-semibold">Mood logged. Keep taking care of yourself.</p>
               </div>
             )}
           </GlassCard>
@@ -484,16 +484,16 @@ export const WellbeingPage: React.FC = () => {
               <p className="font-bold text-sm mb-3" style={{ color: "var(--color-text-primary)" }}>This Week's Mood</p>
               <div className="flex items-end gap-2">
                 {[
-                  { day: "Mon", emoji: "😄", color: "#16a34a" },
-                  { day: "Tue", emoji: "🙂", color: "#264796" },
-                  { day: "Wed", emoji: "😰", color: "#dc2626" },
-                  { day: "Thu", emoji: "😐", color: "#d0ae61" },
-                  { day: "Fri", emoji: "🙂", color: "#264796" },
-                  { day: "Sat", emoji: "😄", color: "#16a34a" },
-                  { day: "Sun", emoji: "😴", color: "#7c3aed" },
+                  { day: "Mon", mark: "G", color: "#16a34a" },
+                  { day: "Tue", mark: "G", color: "#264796" },
+                  { day: "Wed", mark: "S", color: "#dc2626" },
+                  { day: "Thu", mark: "N", color: "#d0ae61" },
+                  { day: "Fri", mark: "G", color: "#264796" },
+                  { day: "Sat", mark: "G", color: "#16a34a" },
+                  { day: "Sun", mark: "T", color: "#7c3aed" },
                 ].map(d => (
                   <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-xl">{d.emoji}</span>
+                    <span className="text-xl font-semibold">{d.mark}</span>
                     <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{d.day}</span>
                   </div>
                 ))}

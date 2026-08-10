@@ -133,7 +133,7 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({ attempt, onClose }) =>
                            <div key={choice.id} className={`px-4 py-3 rounded-2xl border flex items-center justify-between text-sm transition-all ${stateStyles}`}>
                               <div className="flex items-center gap-3">
                                  <span className="w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold">
-                                    {isSelected ? (isChoiceCorrect ? "✓" : "✗") : ""}
+                                    {isSelected ? (isChoiceCorrect ? "" : "") : ""}
                                  </span>
                                  {choice.choice_text}
                               </div>

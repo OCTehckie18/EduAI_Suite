@@ -24,10 +24,10 @@ const suggestedPrompts = [
 ];
 
 const mockResponses: Record<string, string> = {
-  "summarize": `**CSC401 — Advanced Neural Networks: Key Learning Outcomes**\n\n1. **Foundational Architecture** — Students can design and implement feedforward and recurrent neural networks.\n2. **Training Techniques** — Proficiency in backpropagation, gradient descent variants (SGD, Adam, RMSProp).\n3. **Regularization** — Understanding of dropout, L1/L2 regularization, and batch normalization.\n4. **Evaluation** — Ability to apply cross-validation, confusion matrix analysis, and F1 scoring.\n5. **Applications** — Hands-on implementation of CNNs for image classification and LSTMs for sequence modeling.\n\n> 📊 Current batch completion rate: **68%** — on track for end-of-semester assessment.`,
-  "risk": `**At-Risk Students — CSC401 Neural Networks (as of today)**\n\n| Student | Risk Score | Primary Concern |\n|---------|------------|------------------|\n| Arjun Mehta (S4121) | 🔴 82 | Attendance: 42% |\n| Priya Sharma (S4122) | 🔴 74 | Consecutive low marks |\n| Rohan Verma (S4109) | 🟡 58 | Missing assignments |\n| Sneha Patil (S4135) | 🟡 51 | Irregular attendance |\n\n**Recommended Actions:**\n- Schedule individual check-ins with Arjun & Priya this week\n- Send automated reminder to Rohan about pending Assessment 3\n- Review if Sneha has any documented personal circumstances\n\n> ℹ️ Risk scores are computed daily at 02:00 AM using AI-weighted attendance, marks, and assignment factors.`,
-  "generate": `**5 MCQ Questions on Backpropagation**\n\n**Q1.** In backpropagation, the chain rule is applied to compute:\na) Forward pass activations\nb) Gradients of the loss with respect to each weight ✅\nc) The learning rate schedule\nd) Batch normalization parameters\n\n**Q2.** The vanishing gradient problem is most severe when using:\na) ReLU activation\nb) Sigmoid activation ✅\nc) Leaky ReLU\nd) Softmax output\n\n**Q3.** Which optimizer uses adaptive learning rates per parameter?\na) Standard SGD\nb) Momentum SGD\nc) Adam ✅\nd) Batch Gradient Descent\n\n**Q4.** Batch normalization is applied:\na) Only at the output layer\nb) Before or after the activation function ✅\nc) Only during inference\nd) Only in convolutional layers\n\n**Q5.** Gradient clipping is primarily used to address:\na) Vanishing gradients\nb) Exploding gradients ✅\nc) Overfitting\nd) Data imbalance`,
-  "default": `I'm your **EduAI Assistant**, trained on your institution's academic context.\n\nI can help you with:\n- 📊 **Analytics** — Student performance summaries and risk identification\n- 📝 **Content** — Generate exam questions, announcements, and reading materials\n- 🎓 **Classroom** — Course planning, resource recommendations\n- 📈 **Reports** — Summarize trends and generate insights\n\nWhat would you like to explore today?`,
+  "summarize": `**CSC401 — Advanced Neural Networks: Key Learning Outcomes**\n\n1. **Foundational Architecture** — Students can design and implement feedforward and recurrent neural networks.\n2. **Training Techniques** — Proficiency in backpropagation, gradient descent variants (SGD, Adam, RMSProp).\n3. **Regularization** — Understanding of dropout, L1/L2 regularization, and batch normalization.\n4. **Evaluation** — Ability to apply cross-validation, confusion matrix analysis, and F1 scoring.\n5. **Applications** — Hands-on implementation of CNNs for image classification and LSTMs for sequence modeling.\n\n>  Current batch completion rate: **68%** — on track for end-of-semester assessment.`,
+  "risk": `**At-Risk Students — CSC401 Neural Networks (as of today)**\n\n| Student | Risk Score | Primary Concern |\n|---------|------------|------------------|\n| Arjun Mehta (S4121) |  82 | Attendance: 42% |\n| Priya Sharma (S4122) |  74 | Consecutive low marks |\n| Rohan Verma (S4109) |  58 | Missing assignments |\n| Sneha Patil (S4135) |  51 | Irregular attendance |\n\n**Recommended Actions:**\n- Schedule individual check-ins with Arjun & Priya this week\n- Send automated reminder to Rohan about pending Assessment 3\n- Review if Sneha has any documented personal circumstances\n\n> ℹ️ Risk scores are computed daily at 02:00 AM using AI-weighted attendance, marks, and assignment factors.`,
+  "generate": `**5 MCQ Questions on Backpropagation**\n\n**Q1.** In backpropagation, the chain rule is applied to compute:\na) Forward pass activations\nb) Gradients of the loss with respect to each weight \nc) The learning rate schedule\nd) Batch normalization parameters\n\n**Q2.** The vanishing gradient problem is most severe when using:\na) ReLU activation\nb) Sigmoid activation \nc) Leaky ReLU\nd) Softmax output\n\n**Q3.** Which optimizer uses adaptive learning rates per parameter?\na) Standard SGD\nb) Momentum SGD\nc) Adam \nd) Batch Gradient Descent\n\n**Q4.** Batch normalization is applied:\na) Only at the output layer\nb) Before or after the activation function \nc) Only during inference\nd) Only in convolutional layers\n\n**Q5.** Gradient clipping is primarily used to address:\na) Vanishing gradients\nb) Exploding gradients \nc) Overfitting\nd) Data imbalance`,
+  "default": `I'm your **EduAI Assistant**, trained on your institution's academic context.\n\nI can help you with:\n-  **Analytics** — Student performance summaries and risk identification\n-  **Content** — Generate exam questions, announcements, and reading materials\n-  **Classroom** — Course planning, resource recommendations\n-  **Reports** — Summarize trends and generate insights\n\nWhat would you like to explore today?`,
 };
 
 const getAIResponse = (input: string): string => {
@@ -60,7 +60,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
             <div key={i} className="flex gap-0 text-xs overflow-x-auto">
               {cells.map((c, ci) => (
                 <div key={ci} className="flex-1 min-w-20 px-2 py-1 border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
-                  {c.replace(/✅|🔴|🟡/g, c.includes("✅") ? "✓" : "").trim()}
+                  {c.replace(/\[correct\]|\[high\]|\[moderate\]/g, c.includes("[correct]") ? "✓" : "").trim()}
                 </div>
               ))}
             </div>
@@ -79,11 +79,11 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
           return <p key={i} className="text-sm font-semibold mt-3" style={{ color: "var(--color-text-primary)" }}>{line.replace(/\*\*/g, "")}</p>;
         }
         if (/^[a-d]\)/.test(line)) {
-          const isCorrect = line.includes("✅");
+          const isCorrect = line.includes("[correct]");
           return (
             <p key={i} className={`text-sm pl-4 ${isCorrect ? "font-semibold" : ""}`}
               style={{ color: isCorrect ? "#16a34a" : "var(--color-text-secondary)" }}>
-              {line.replace(" ✅", isCorrect ? " ✓" : "")}
+              {line.replace(" ", isCorrect ? " " : "")}
             </p>
           );
         }

@@ -158,7 +158,7 @@ export const useGameSync = ({
           ws.close();
           return;
         }
-        console.log("[useGameSync] WebSocket connected ✓");
+        console.log("[useGameSync] WebSocket connected ");
         setIsConnected(true);
         setConnectionMode("ws");
         reconnectCountRef.current = 0;

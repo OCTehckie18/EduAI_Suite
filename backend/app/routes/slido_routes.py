@@ -42,7 +42,7 @@ def validate_pptx_file(file_content: bytes, filename: str) -> bool:
 
 
 def save_pptx_file(file_content: bytes, file_name: str) -> Optional[str]:
-    """Save PPTX file to S3-compatible storage and return presigned URL"""
+    """Save PPTX file to Supabase Storage and return a signed URL."""
     try:
         storage = get_storage_service()
         unique_filename = f"{secrets.token_hex(16)}_{file_name}"
@@ -179,7 +179,7 @@ async def upload_presentation(
         raise HTTPException(
             status_code=400, detail="File too large. Max 100MB.")
 
-    # Save file to S3-compatible storage
+    # Save file to Supabase Storage
     file_url = save_pptx_file(file_content, file.filename)
     if not file_url:
         raise HTTPException(

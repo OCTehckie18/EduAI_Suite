@@ -115,7 +115,7 @@ async def extract_course_details(file: UploadFile = File(...)):
     if name_match: details["name"] = name_match.group(1).strip()
     
 
-    # 🔹 Instructor (handles multiple formats)
+    #  Instructor (handles multiple formats)
     instructor_match = re.search(
         r"(?:Course\s+Instructor\(s\)\s+Name|Instructor)[:\s#]+(.+)",
         text,
@@ -126,7 +126,7 @@ async def extract_course_details(file: UploadFile = File(...)):
         details["teacher_name"] = instructor_match.group(1).strip()
 
 
-    # 🔹 Programmes → Description (ROBUST FIX)
+    #  Programmes → Description (ROBUST FIX)
 
     lines = raw_text.split("\n") if file.filename.endswith(".pdf") else paragraphs_text.split("\n")
 

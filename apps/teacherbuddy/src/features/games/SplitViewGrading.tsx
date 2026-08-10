@@ -60,14 +60,14 @@ const DEFAULT_RUBRIC: RubricItem[] = [
 ];
 
 const FEEDBACK_TEMPLATES = [
-  { emoji: "🎯", text: "Excellent work! Your research was thorough and well-presented." },
-  { emoji: "🗣️", text: "Great delivery — confident and clear communication." },
-  { emoji: "🎨", text: "Beautiful slides with professional visual design." },
-  { emoji: "⏰", text: "Work on pacing — some sections felt rushed." },
-  { emoji: "💡", text: "Consider adding more audience interaction next time." },
-  { emoji: "📊", text: "Strong data visualization and supporting evidence." },
-  { emoji: "📝", text: "Add more citations and references to strengthen arguments." },
-  { emoji: "🎭", text: "Try varying your tone to keep the audience engaged." },
+  { mark: "EX", text: "Excellent work! Your research was thorough and well-presented." },
+  { mark: "DL", text: "Great delivery — confident and clear communication." },
+  { mark: "VD", text: "Beautiful slides with professional visual design." },
+  { mark: "TM", text: "Work on pacing — some sections felt rushed." },
+  { mark: "AI", text: "Consider adding more audience interaction next time." },
+  { mark: "DA", text: "Strong data visualization and supporting evidence." },
+  { mark: "RF", text: "Add more citations and references to strengthen arguments." },
+  { mark: "VC", text: "Try varying your tone to keep the audience engaged." },
 ];
 
 // ─── Component ────────────────────────────────────────────────
@@ -471,7 +471,7 @@ const SplitViewGrading: React.FC = () => {
                       disabled={saving || success}
                       className="flex items-start gap-1.5 text-left text-[11px] text-slate-600 hover:bg-blue-50 hover:text-blue-700 rounded-lg p-2 transition disabled:opacity-50 leading-tight"
                     >
-                      <span className="text-sm flex-shrink-0">{tmpl.emoji}</span>
+                      <span className="text-xs font-semibold flex-shrink-0">{tmpl.mark}</span>
                       <span className="line-clamp-2">{tmpl.text}</span>
                     </button>
                   ))}

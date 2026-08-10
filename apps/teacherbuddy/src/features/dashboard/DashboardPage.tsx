@@ -82,7 +82,7 @@ export const DashboardPage: React.FC = () => {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-display)" }}>
-            {getGreeting()}, {authUser?.name || "Professor"} 👋
+            {getGreeting()}, {authUser?.name || "Professor"}
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
             {getFormattedDate()} — Here's your academic overview for today.

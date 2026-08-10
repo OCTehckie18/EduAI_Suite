@@ -161,7 +161,7 @@ export const ChainAnswerGameJoinPage: React.FC<
               style={{ color: "var(--color-error)" }}
               className="font-semibold"
             >
-              ❌ {error}
+              {error}
             </p>
           </motion.div>
         )}
@@ -205,11 +205,11 @@ export const ChainAnswerGameJoinPage: React.FC<
           className="space-y-2 text-sm"
           style={{ color: "var(--color-text-secondary)" }}
         >
-          <li>✓ Get the session ID from your teacher</li>
-          <li>✓ Enter your name and join the game</li>
-          <li>✓ When the game starts, take turns submitting words</li>
-          <li>✓ Each word must follow the game's chain rule</li>
-          <li>✓ Earn points for valid words and speed</li>
+          <li> Get the session ID from your teacher</li>
+          <li> Enter your name and join the game</li>
+          <li> When the game starts, take turns submitting words</li>
+          <li> Each word must follow the game's chain rule</li>
+          <li> Earn points for valid words and speed</li>
         </ul>
       </GlassCard>
     </div>

@@ -500,7 +500,7 @@ export const AnalyticsPage: React.FC = () => {
               <div className="mx-4 p-4 rounded-b-xl border-x border-b border-slate-100 bg-slate-50/50 animate-slide-down space-y-4">
                 {s.missing_data ? (
                   <div className="text-center py-4">
-                    <p className="text-sm text-yellow-700 font-semibold mb-1">⚠ No score data available</p>
+                    <p className="text-sm text-yellow-700 font-semibold mb-1">No score data available</p>
                     <p className="text-xs text-slate-500">This student has missing values in the dataset. Switch to an imputation method to estimate their score.</p>
                   </div>
                 ) : (

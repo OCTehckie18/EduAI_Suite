@@ -60,7 +60,7 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
             <div key={i} className="flex gap-0 text-xs overflow-x-auto">
               {cells.map((c, ci) => (
                 <div key={ci} className="flex-1 min-w-20 px-2 py-1 border-b" style={{ borderColor: "rgba(38,71,150,0.1)" }}>
-                  {c.replace(/✅|🔴|🟡/g, c.includes("✅") ? "✓" : "").trim()}
+                  {c.replace(/\[correct\]|\[high\]|\[moderate\]/g, c.includes("[correct]") ? "✓" : "").trim()}
                 </div>
               ))}
             </div>
@@ -79,11 +79,11 @@ const Markdown: React.FC<{ content: string }> = ({ content }) => {
           return <p key={i} className="text-sm font-semibold mt-3" style={{ color: "var(--color-text-primary)" }}>{line.replace(/\*\*/g, "")}</p>;
         }
         if (/^[a-d]\)/.test(line)) {
-          const isCorrect = line.includes("✅");
+          const isCorrect = line.includes("[correct]");
           return (
             <p key={i} className={`text-sm pl-4 ${isCorrect ? "font-semibold" : ""}`}
               style={{ color: isCorrect ? "#16a34a" : "var(--color-text-secondary)" }}>
-              {line.replace(" ✅", isCorrect ? " ✓" : "")}
+              {line.replace(" ", isCorrect ? " " : "")}
             </p>
           );
         }

@@ -292,7 +292,7 @@ async def run_concurrency_test(num_students: int = 50, duration: int = 120):
         print(f"  Avg: {statistics.mean(all_response_times):.2f}")
         print(f"  Max: {max(all_response_times):.2f}")
 
-    status = "✓ PASS" if total_errors == 0 and connected == num_students else "✗ FAIL"
+    status = " PASS" if total_errors == 0 and connected == num_students else " FAIL"
     print(f"\n{status}\n")
 
 

@@ -87,7 +87,7 @@ async def init_db():
             CalendarEvent, Resource,
         ],
     )
-    logger.info(f"✅ MongoDB connected: {MONGODB_URL}/{DB_NAME}")
+    logger.info(f" MongoDB connected: {MONGODB_URL}/{DB_NAME}")
 
 
 async def close_db():

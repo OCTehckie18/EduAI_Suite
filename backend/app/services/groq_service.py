@@ -53,19 +53,19 @@ class GroqService:
 
         groq_api_key = os.getenv("GROQ_API_KEY")
         if not groq_api_key:
-            logger.error("❌ GROQ_API_KEY not set in environment")
+            logger.error(" GROQ_API_KEY not set in environment")
             cls._available = False
         else:
             try:
                 cls._client = Groq(api_key=groq_api_key)
                 cls._available = cls.is_groq_available()
                 if cls._available:
-                    logger.info(f"✅ Groq Connected and Ready")
+                    logger.info(f" Groq Connected and Ready")
                 else:
                     logger.warning(
-                        "⚠️  Groq service check failed - using fallback validator")
+                        "️  Groq service check failed - using fallback validator")
             except Exception as e:
-                logger.error(f"❌ Failed to initialize Groq: {e}")
+                logger.error(f" Failed to initialize Groq: {e}")
                 cls._available = False
         logger.info("="*60)
 
@@ -90,7 +90,7 @@ class GroqService:
                 model=DEFAULT_MODEL,
                 max_tokens=10,
             )
-            logger.info("✅ Groq service is available and responding")
+            logger.info(" Groq service is available and responding")
             return True
         except Exception as e:
             logger.warning(f"Groq availability check failed: {e}")

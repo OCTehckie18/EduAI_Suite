@@ -523,8 +523,8 @@ export const OMRPage: React.FC = () => {
                       <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: barColor }} />
                     </div>
                     <div className="flex gap-4 text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
-                      <span className="text-green-600">✓ {q.correct_count}</span>
-                      <span className="text-red-600">✗ {q.wrong_count}</span>
+                      <span className="text-green-600"> {q.correct_count}</span>
+                      <span className="text-red-600"> {q.wrong_count}</span>
                       <span className="text-yellow-600">? {q.uncertain_count}</span>
                       <span>{pct}% correct</span>
                     </div>

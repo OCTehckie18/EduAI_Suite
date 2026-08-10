@@ -3,6 +3,7 @@ import { Loader } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import logo from "../../assets/logo (5).png";
 import { useAuthStore } from "../../store/useAuthStore";
+import { supabase } from "../../lib/supabase";
 
 export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -25,10 +26,17 @@ export const AuthPage: React.FC = () => {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/google-login", {
+      const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: credential,
+      });
+      if (authError || !authData.session) {
+        throw authError || new Error("Supabase did not return a session");
+      }
+
+      const res = await fetch("/api/auth/supabase-sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
+        headers: { Authorization: `Bearer ${authData.session.access_token}` },
       });
 
       const data = await res.json();
@@ -42,7 +50,7 @@ export const AuthPage: React.FC = () => {
         }
 
         googleLogin(
-          data.access_token,
+          authData.session.access_token,
           data.user,
           data.status
         );
@@ -102,15 +110,15 @@ export const AuthPage: React.FC = () => {
         {/* Feature Highlights */}
         <div className="space-y-4 relative">
           {[
-            { emoji: "🧠", title: "AI Evaluation", desc: "Automated subjective answer scoring with teacher review" },
-            { emoji: "⚠️", title: "Risk Detection", desc: "Early warning system for student dropout risk" },
-            { emoji: "📊", title: "Live Analytics", desc: "Real-time performance dashboards and trend analysis" },
-            { emoji: "📚", title: "Content Studio", desc: "AI-generated lesson plans and interactive quizzes" },
+            { mark: "AI", title: "AI Evaluation", desc: "Automated subjective answer scoring with teacher review" },
+            { mark: "RD", title: "Risk Detection", desc: "Early warning system for student dropout risk" },
+            { mark: "LA", title: "Live Analytics", desc: "Real-time performance dashboards and trend analysis" },
+            { mark: "CS", title: "Content Studio", desc: "AI-generated lesson plans and interactive quizzes" },
           ].map(f => (
             <div key={f.title} className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base"
                 style={{ background: "rgba(255,255,255,0.08)" }}>
-                {f.emoji}
+                {f.mark}
               </div>
               <div>
                 <p className="text-white font-semibold text-sm">{f.title}</p>
@@ -196,7 +204,7 @@ export const AuthPage: React.FC = () => {
                         onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-brand-blue)"; e.currentTarget.style.background = "rgba(38,71,150,0.03)"; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.background = "var(--color-surface-base)"; }}
                       >
-                        <span>🧑‍🏫 Sign in as Demo Teacher</span>
+                        <span>Sign in as Demo Teacher</span>
                         <span className="text-[10px] text-slate-400 font-mono">teacher@christuniversity.in</span>
                       </button>
                       <button
@@ -206,7 +214,7 @@ export const AuthPage: React.FC = () => {
                         onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-brand-blue)"; e.currentTarget.style.background = "rgba(38,71,150,0.03)"; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.background = "var(--color-surface-base)"; }}
                       >
-                        <span>🛡️ Sign in as Demo Admin</span>
+                        <span>Sign in as Demo Admin</span>
                         <span className="text-[10px] text-slate-400 font-mono font-bold">omkar.chakraborty2001@gmail.com</span>
                       </button>
                     </div>
