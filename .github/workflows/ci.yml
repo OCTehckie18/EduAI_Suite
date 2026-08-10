@@ -55,7 +55,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/eduai-backend
+          images: omkaartehckie/eduai-suite
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=development,enable=${{ github.ref == 'refs/heads/development' }}
