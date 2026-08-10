@@ -8,7 +8,7 @@ import requests
 
 
 class SupabaseStorageService:
-    """Storage implementation compatible with the existing StorageService API."""
+    """Storage implementation used by all backend upload workflows."""
 
     def __init__(self) -> None:
         self.supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
@@ -73,13 +73,26 @@ class SupabaseStorageService:
         return response.content
 
     def delete_file(self, object_key: str) -> bool:
-        response = requests.delete(
-            f"{self.supabase_url}/storage/v1/object/{quote(self.bucket_name, safe='')}",
+        response = requests.post(
+            f"{self.supabase_url}/storage/v1/object/remove/{quote(self.bucket_name, safe='')}",
             headers={**self._headers, "Content-Type": "application/json"},
             json={"prefixes": [object_key]},
             timeout=10,
         )
         return response.ok
 
+    def list_files(self, folder: str = "presentations", max_keys: int = 100) -> list:
+        response = requests.post(
+            f"{self.supabase_url}/storage/v1/object/list/{quote(self.bucket_name, safe='')}",
+            headers={**self._headers, "Content-Type": "application/json"},
+            json={"prefix": folder.strip("/") + "/", "limit": max_keys, "offset": 0},
+            timeout=10,
+        )
+        if not response.ok:
+            raise RuntimeError(f"Supabase Storage list failed: {response.status_code} {response.text[:200]}")
+        return response.json()
+
     def get_file_url(self, object_key: str, temporary: bool = True, expiration: int = 3600) -> Optional[str]:
-        return self.generate_presigned_url(object_key, expiration) if temporary else self._object_url(object_key)
+        if temporary:
+            return self.generate_presigned_url(object_key, expiration)
+        return f"{self.supabase_url}/storage/v1/object/public/{quote(self.bucket_name, safe='')}/{quote(object_key, safe='/')}"

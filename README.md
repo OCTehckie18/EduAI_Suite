@@ -42,7 +42,7 @@ EduAI_Suite/
 │   ├── requirements-test.txt
 │   └── pytest.ini
 ├── .github/workflows/ci.yml   # Frontend and backend CI
-├── docker-compose.minio.yml   # Optional local MinIO storage
+├── supabase/                   # Supabase migrations and configuration
 ├── TESTING_README.md          # Detailed testing notes
 └── package.json               # npm workspace and root scripts
 ```
@@ -51,7 +51,7 @@ EduAI_Suite/
 
 - React, TypeScript, Vite, React Router, Tailwind CSS, Zustand, TanStack Query, Framer Motion, and Vitest for the frontend.
 - Python, FastAPI, Uvicorn, Pydantic, Motor/Beanie, and Pytest for the backend.
-- MongoDB is used by the backend persistence layer. MinIO or S3 can be used for uploaded files and generated assets.
+ - MongoDB is used by the backend persistence layer. Supabase Storage is used for uploaded files and generated assets.
 - Groq is used for AI-powered features. Google OAuth and SMTP integrations are configured through environment variables.
 
 ## Prerequisites
@@ -60,7 +60,7 @@ EduAI_Suite/
 - Python 3.10 or newer
 - MongoDB for backend development and tests
 - A Groq API key for AI features
-- Optional: MinIO/S3, Google OAuth credentials, and SMTP credentials
+ - Optional: Supabase Storage, Google OAuth credentials, and SMTP credentials
 
 ## Setup
 
@@ -92,7 +92,7 @@ Copy-Item backend/.env.example backend/.env       # Windows PowerShell
 # cp backend/.env.example backend/.env             # macOS/Linux
 ```
 
-At minimum, configure `GROQ_API_KEY`. The template also documents MongoDB, MinIO/S3, Google OAuth, SMTP, teacher-domain, and admin-email settings used by the backend.
+At minimum, configure `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET`. The template also documents MongoDB, Supabase Auth/Storage, Google OAuth, SMTP, teacher-domain, and admin-email settings used by the backend.
 
 ## Run locally
 
@@ -115,7 +115,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - API: <http://localhost:8000>
 - Swagger UI: <http://localhost:8000/docs>
 
-To run local object storage, use `docker-compose.minio.yml` and keep `USE_S3=false` with the MinIO settings from `backend/.env.example`.
+Create the `SUPABASE_STORAGE_BUCKET` bucket in the Supabase Dashboard before uploading files. The backend uses the service-role key to upload, download, delete, and sign files server-side.
 
 ## Commands
 
