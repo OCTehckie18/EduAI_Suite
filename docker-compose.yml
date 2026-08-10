@@ -13,7 +13,7 @@ services:
       retries: 10
 
   backend:
-    image: ${DOCKERHUB_USERNAME:-local}/eduai-backend:${BACKEND_IMAGE_TAG:-latest}
+    image: omkaartehckie/eduai-suite:${BACKEND_IMAGE_TAG:-development}
     build:
       context: ./backend
       dockerfile: Dockerfile
