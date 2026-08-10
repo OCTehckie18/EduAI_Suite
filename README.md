@@ -113,7 +113,14 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 - API: <http://localhost:8000>
-- Swagger UI: <http://localhost:8000/docs>
+ - Swagger UI: <http://localhost:8000/docs>
+
+## Docker
+
+Copy the Supabase variables from backend/.env into the repository .env, then run docker compose up --build.
+
+The backend is available at http://localhost:8000. To use the published image,
+set DOCKERHUB_USERNAME and BACKEND_IMAGE_TAG in .env.
 
 Create the `SUPABASE_STORAGE_BUCKET` bucket in the Supabase Dashboard before uploading files. The backend uses the service-role key to upload, download, delete, and sign files server-side.
 
