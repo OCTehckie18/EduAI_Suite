@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "installCommand": "npm install --include=optional --legacy-peer-deps && npm install --no-save --legacy-peer-deps @rolldown/binding-linux-x64-gnu@1.0.0-rc.15 lightningcss-linux-x64-gnu@1.32.0",
+  "installCommand": "npm install --include=optional --legacy-peer-deps && npm install --no-save --legacy-peer-deps @rolldown/binding-linux-x64-gnu@1.0.0-rc.15 @tailwindcss/oxide-linux-x64-gnu@4.2.2 lightningcss-linux-x64-gnu@1.32.0",
   "buildCommand": "npm run build",
   "outputDirectory": "dist"
 }
