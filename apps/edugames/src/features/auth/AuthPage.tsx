@@ -5,8 +5,7 @@ import logo from "../../assets/logo (5).png";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -38,7 +37,7 @@ export const AuthPage: React.FC = () => {
         throw authError || new Error("Supabase did not return a session");
       }
 
-      const res = await fetch(`${API_BASE_URL}/auth/supabase-sync`, {
+      const res = await fetch(`${API_ENDPOINTS.AUTH}/supabase-sync`, {
         method: "POST",
         headers: { Authorization: `Bearer ${authData.session.access_token}` },
       });

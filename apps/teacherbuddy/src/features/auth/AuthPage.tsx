@@ -4,6 +4,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import logo from "../../assets/logo (5).png";
 import { useAuthStore } from "../../store/useAuthStore";
 import { supabase } from "../../lib/supabase";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 export const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -34,7 +35,7 @@ export const AuthPage: React.FC = () => {
         throw authError || new Error("Supabase did not return a session");
       }
 
-      const res = await fetch("/api/auth/supabase-sync", {
+      const res = await fetch(`${API_ENDPOINTS.AUTH}/supabase-sync`, {
         method: "POST",
         headers: { Authorization: `Bearer ${authData.session.access_token}` },
       });
