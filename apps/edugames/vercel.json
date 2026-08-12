@@ -7,6 +7,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://eduai-suite-development.onrender.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
