@@ -2,8 +2,8 @@
  * Centralized API configuration.
  *
  * VITE_API_URL should be the public backend origin in deployed frontends, e.g.
- * https://your-backend.example.com. When it is not set, default to /api so the
- * local Vite proxy or a same-origin reverse proxy can forward requests.
+ * https://your-backend.example.com. When it is not set, default to /api. The
+ * Vercel deployment rewrites /api/* to the public backend as a fallback.
  */
 export const API_BASE_URL = (
   import.meta.env.VITE_API_URL || "/api"
