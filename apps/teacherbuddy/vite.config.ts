@@ -9,6 +9,10 @@ export default defineConfig({
     allowedHosts: true,
     port: 5173,
     strictPort: true,
+    // Google Identity Services uses a popup and window.postMessage during local sign-in.
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8000",

@@ -1,16 +1,45 @@
-import React from "react";
-import { Clock, LogOut, ShieldX } from "lucide-react";
+import React, { useState } from "react";
+import { Clock, Loader, LogOut, ShieldX } from "lucide-react";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/logo (5).png";
+import { supabase } from "../../lib/supabase";
+import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 export const WaitingPage: React.FC = () => {
-  const { status, user, logout } = useAuthStore();
+  const { status, user, googleLogin, logout } = useAuthStore();
   const navigate = useNavigate();
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState("");
 
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  const handleCheckAgain = async () => {
+    setChecking(true);
+    setError("");
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token || localStorage.getItem("token");
+      if (!accessToken) throw new Error("Your session has expired. Please sign in again.");
+
+      const response = await fetch(`${API_ENDPOINTS.AUTH}/supabase-sync`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Unable to check your approval status.");
+
+      googleLogin(accessToken, data.user, data.status);
+      if (data.status === "approved") navigate("/");
+    } catch (checkError) {
+      setError(checkError instanceof Error ? checkError.message : "Unable to check your approval status.");
+    } finally {
+      setChecking(false);
+    }
   };
 
   const isDenied = status === "denied";
@@ -83,6 +112,12 @@ export const WaitingPage: React.FC = () => {
             )}
           </p>
 
+          {error && (
+            <p className="mb-4 text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          )}
+
           {/* User info card */}
           {user && (
             <div
@@ -125,10 +160,11 @@ export const WaitingPage: React.FC = () => {
           <div className="space-y-3">
             {!isDenied && (
               <button
-                onClick={() => window.location.reload()}
+                onClick={handleCheckAgain}
+                disabled={checking}
                 className="btn btn-primary w-full py-3 text-sm font-bold"
               >
-                Check Again
+                {checking ? <Loader size={16} className="mx-auto animate-spin" /> : "Check Again"}
               </button>
             )}
             <button
