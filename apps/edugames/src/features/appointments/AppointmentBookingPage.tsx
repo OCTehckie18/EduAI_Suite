@@ -164,9 +164,11 @@ export const AppointmentBookingPage: React.FC = () => {
     setSyncError(null);
 
     try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
       const [courseResponse, appointmentResponse] = await Promise.all([
         fetch(`${API_URL}/courses/`),
-        fetch(`${API_URL}/appointments/student/${encodeURIComponent(CURRENT_STUDENT)}`),
+        fetch(`${API_URL}/appointments/student/${encodeURIComponent(CURRENT_STUDENT)}`, { headers }),
       ]);
 
       if (!courseResponse.ok) {
@@ -212,7 +214,12 @@ export const AppointmentBookingPage: React.FC = () => {
     try {
       const response = await fetch(`${API_URL}/appointments/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("token")
+            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+            : {}),
+        },
         body: JSON.stringify({
           student_name: CURRENT_STUDENT,
           student_email: get_user()?.email || get_user()?.sub || "student@christuniversity.in",

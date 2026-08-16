@@ -99,18 +99,12 @@ export const StudentCalendar: React.FC = () => {
   const fetchEventsAndNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const storedUser = localStorage.getItem("user");
-      let query = "";
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser);
-          if (user.email) query = `?student_email=${encodeURIComponent(user.email)}`;
-        } catch (e) {}
-      }
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
       const [eventsRes, notificationsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/calendar/events${query}`),
-        fetch(`${API_BASE_URL}/calendar/notifications${query}`)
+        fetch(`${API_BASE_URL}/calendar/events`, { headers }),
+        fetch(`${API_BASE_URL}/calendar/notifications`, { headers })
       ]);
       
       if (eventsRes.ok) {
@@ -214,7 +208,11 @@ export const StudentCalendar: React.FC = () => {
   const handleDeleteEvent = async (id: number) => {
     if (!confirm("Are you sure you want to delete this event?")) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/calendar/events/${id}`, { method: "DELETE" });
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE_URL}/calendar/events/${id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (res.ok) fetchEventsAndNotifications();
     } catch (err) { console.error("Failed to delete event:", err); }
   };
@@ -246,9 +244,13 @@ export const StudentCalendar: React.FC = () => {
       const url = editEventId ? `${API_BASE_URL}/calendar/events/${editEventId}` : `${API_BASE_URL}/calendar/events`;
       const method = editEventId ? "PUT" : "POST";
       
+      const token = localStorage.getItem("token");
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(payload),
       });
       

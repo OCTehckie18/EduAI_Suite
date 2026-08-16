@@ -3,12 +3,6 @@ import { FileSignature, Sparkles, Wand2 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { useTheme } from "../../shared/hooks/useTheme";
 
-const mockForms = [
-  { id: 1, name: "#", desc: "#" },
-  { id: 2, name: "#", desc: "#" },
-  { id: 3, name: "#", desc: "#" },
-];
-
 export const FormsPage: React.FC = () => {
   const { isDark } = useTheme();
 
@@ -22,23 +16,11 @@ export const FormsPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {mockForms.map(form => (
-          <GlassCard key={form.id} className="p-6 flex flex-col items-start gap-4 hover:-translate-y-1 transition-transform cursor-pointer">
-             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg">
-                <FileSignature size={24} />
-             </div>
-             <div>
-               <h3 className="font-bold text-lg mb-1" style={{ color: "var(--color-text-primary)" }}>{form.name}</h3>
-               <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{form.desc}</p>
-             </div>
-             
-             <div className="mt-auto w-full pt-4">
-                <button className="w-full btn bg-blue-50/50 hover:bg-blue-100/50 border text-blue-600 border-blue-200/50 flex items-center justify-center gap-2">
-                   <Sparkles size={16} /> Auto-Fill
-                </button>
-             </div>
-          </GlassCard>
-        ))}
+        <GlassCard className="p-6 md:col-span-2 lg:col-span-3 flex flex-col items-center justify-center gap-3 min-h-48 text-center">
+          <FileSignature size={32} style={{ color: "var(--color-text-muted)" }} />
+          <p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>No form templates are available.</p>
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Upload a template to make it available for AI-assisted completion.</p>
+        </GlassCard>
 
         {/* Custom Form Block */}
         <div className="p-1 rounded-3xl" style={{ background: "linear-gradient(135deg,rgba(208,174,97,0.4),rgba(38,71,150,0.4))" }}>

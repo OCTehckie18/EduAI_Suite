@@ -3,16 +3,17 @@ import { CheckSquare, AlertTriangle, CheckCircle2, ChevronRight, Filter } from "
 import { GlassCard } from "../../shared/components/GlassCard";
 import { motion } from "framer-motion";
 
-const mockEvaluations = [
-  { id: 1, student: "#", regNo: "#", subj: "#", score: 0, aiConfidence: 0, status: "pending", snippet: "#" },
-  { id: 2, student: "#", regNo: "#", subj: "#", score: 0, aiConfidence: 0, status: "flagged", plagiarism: 0, snippet: "#" },
-  { id: 3, student: "#", regNo: "#", subj: "#", score: 0, aiConfidence: 0, status: "pending", snippet: "#" },
-];
+interface Evaluation {
+  student: string;
+  regNo: string;
+  subj: string;
+  score: number;
+  plagiarism?: number;
+  snippet: string;
+}
 
 export const EvaluationPage: React.FC = () => {
-  const [selectedEval, setSelectedEval] = useState<number | null>(1);
-
-  const selected = mockEvaluations.find(e => e.id === selectedEval);
+  const [selected] = useState<Evaluation | null>(null);
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -34,29 +35,7 @@ export const EvaluationPage: React.FC = () => {
              <button className="p-1 rounded hover:bg-black/5"><Filter size={16} style={{ color: "var(--color-text-muted)" }}/></button>
           </div>
           
-          {mockEvaluations.map(ev => (
-            <GlassCard 
-              key={ev.id} 
-              className={`p-4 cursor-pointer transition-all ${selectedEval === ev.id ? 'ring-2 ring-blue-500' : 'hover:scale-[1.02]'}`}
-              onClick={() => setSelectedEval(ev.id)}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <p className="font-bold text-sm" style={{ color: "var(--color-text-primary)" }}>{ev.student}</p>
-                  <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>{ev.regNo}</p>
-                </div>
-                {ev.status === 'flagged' ? (
-                  <span className="badge badge-red bg-red-50 text-red-600 flex items-center gap-1"><AlertTriangle size={12}/> Flagged</span>
-                ) : (
-                  <span className="badge badge-blue bg-blue-50 text-blue-600 flex items-center gap-1"><CheckCircle2 size={12}/> AI Scored</span>
-                )}
-              </div>
-              <div className="flex justify-between items-end mt-4">
-                <p className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>Assigned: <strong className="text-lg" style={{ color: "var(--color-brand-blue)" }}>{ev.score}</strong>/100</p>
-                <ChevronRight size={16} style={{ color: "var(--color-text-muted)" }}/>
-              </div>
-            </GlassCard>
-          ))}
+          <GlassCard className="p-8 text-center"><CheckSquare className="mx-auto mb-3" style={{ color: "var(--color-text-muted)" }} /><p className="font-semibold" style={{ color: "var(--color-text-primary)" }}>No submissions are waiting for evaluation.</p><p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>Submissions will appear here after students upload assignment work.</p></GlassCard>
         </div>
 
         {/* Right Detail Pane */}

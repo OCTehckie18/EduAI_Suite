@@ -100,19 +100,12 @@ export const CalendarPage: React.FC = () => {
   const fetchEventsAndNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const storedUser = localStorage.getItem("user");
-      let query = "";
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser);
-          // Omit strict teacher_name filter to ensure all assigned events show on the unified calendar
-          // if (user.name) query = `?teacher_name=${encodeURIComponent(user.name)}`;
-        } catch (e) {}
-      }
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
       const [eventsRes, notificationsRes] = await Promise.all([
-        fetch(`${API_ENDPOINTS.CALENDAR}/events${query}`),
-        fetch(`${API_ENDPOINTS.CALENDAR}/notifications${query}`)
+        fetch(`${API_ENDPOINTS.CALENDAR}/events`, { headers }),
+        fetch(`${API_ENDPOINTS.CALENDAR}/notifications`, { headers })
       ]);
       
       if (eventsRes.ok) {
@@ -220,7 +213,10 @@ export const CalendarPage: React.FC = () => {
     
     try {
       const res = await fetch(`${API_ENDPOINTS.CALENDAR}/events/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: localStorage.getItem("token")
+          ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+          : undefined,
       });
       
       if (res.ok) {
@@ -263,7 +259,12 @@ export const CalendarPage: React.FC = () => {
       
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("token")
+            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+            : {}),
+        },
         body: JSON.stringify(payload),
       });
       
