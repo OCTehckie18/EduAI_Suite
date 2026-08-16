@@ -86,7 +86,7 @@ def health_check():
     return {"status": "healthy", "service": "main_api"}
 
 
-@app.post("/api/ai/chat")
+@app.post("/ai/chat")
 def chat(request: AIChatRequest):
     """Generate an AI response without exposing provider credentials to clients."""
     if not GroqService._available or not GroqService._client:
