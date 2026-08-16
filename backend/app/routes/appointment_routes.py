@@ -11,6 +11,12 @@ from app.utils.auth import get_current_user
 appointment_router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 
+def _same_identity(left: Optional[str], right: Optional[str]) -> bool:
+    """Compare stored display names without case/whitespace drift."""
+    normalize = lambda value: " ".join((value or "").split()).casefold()
+    return bool(normalize(left)) and normalize(left) == normalize(right)
+
+
 @appointment_router.get("/", response_model=list[AppointmentResponse])
 async def get_appointments(
     teacher_name: Optional[str] = None,
@@ -18,15 +24,15 @@ async def get_appointments(
     status_filter: Optional[str] = None,
     current_user: User = Depends(get_current_user),
 ):
-    query = Appointment.find(
-        Appointment.teacher_name == current_user.name
-        if current_user.role == "teacher"
-        else Appointment.student_email == current_user.email
-    )
+    query = Appointment.find_all()
     if status_filter:
         query = query.find(Appointment.status == status_filter)
         
     appointments = await query.sort("-int_id").to_list()
+    if current_user.role == "teacher":
+        appointments = [a for a in appointments if _same_identity(a.teacher_name, current_user.name)]
+    else:
+        appointments = [a for a in appointments if a.student_email == current_user.email]
     return [AppointmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in appointments]
 
 
@@ -35,9 +41,10 @@ async def get_teacher_appointments(
     teacher_name: str,
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "teacher" or teacher_name != current_user.name:
+    if current_user.role != "teacher" or not _same_identity(teacher_name, current_user.name):
         raise HTTPException(status_code=403, detail="You can only view your own appointments")
-    appointments = await Appointment.find(Appointment.teacher_name == current_user.name).sort("-int_id").to_list()
+    appointments = await Appointment.find_all().sort("-int_id").to_list()
+    appointments = [a for a in appointments if _same_identity(a.teacher_name, current_user.name)]
     return [AppointmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in appointments]
 
 
@@ -103,7 +110,7 @@ async def update_appointment_status(
     appointment = await Appointment.find_one(Appointment.int_id == appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
-    if current_user.role != "teacher" or appointment.teacher_name != current_user.name:
+    if current_user.role != "teacher" or not _same_identity(appointment.teacher_name, current_user.name):
         raise HTTPException(status_code=403, detail="You can only manage your own appointments")
 
     appointment.status = payload.status
