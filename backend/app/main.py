@@ -11,11 +11,14 @@ import os
 # Load environment variables FIRST
 load_dotenv()
 
-uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+uploads_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "uploads"))
 os.makedirs(uploads_dir, exist_ok=True)
 
-local_uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "local_uploads"))
+local_uploads_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "local_uploads"))
 os.makedirs(local_uploads_dir, exist_ok=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,7 +38,8 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
-app.mount("/local_uploads", StaticFiles(directory=local_uploads_dir), name="local_uploads")
+app.mount("/local_uploads", StaticFiles(directory=local_uploads_dir),
+          name="local_uploads")
 
 app.include_router(course_routes.course_router)
 app.include_router(announcement_routes.announcement_router)

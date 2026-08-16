@@ -149,12 +149,11 @@ export const TeacherAppointmentsPage: React.FC = () => {
     setError(null);
 
     try {
-      const teacherQuery = selectedTeacher !== "All Teachers"
-        ? `?teacher_name=${encodeURIComponent(selectedTeacher)}`
-        : "";
+      const token = localStorage.getItem("token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
       const [appointmentsResponse, coursesResponse] = await Promise.all([
-        fetch(`${API_URL}/appointments/${teacherQuery}`),
+        fetch(`${API_URL}/appointments/`, { headers }),
         fetch(`${API_URL}/courses/`),
       ]);
 
@@ -226,7 +225,12 @@ export const TeacherAppointmentsPage: React.FC = () => {
     try {
       const response = await fetch(`${API_URL}/appointments/${appointment.id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("token")
+            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+            : {}),
+        },
         body: JSON.stringify({
           status,
           reviewed_by: appointment.teacher_name,

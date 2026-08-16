@@ -1,10 +1,12 @@
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Optional
 
 from app.models.appointment import Appointment
 from app.models.history import ActionHistory
 from app.schemas.appointment import AppointmentCreate, AppointmentResponse, AppointmentStatusUpdate
+from app.models.user import User
+from app.utils.auth import get_current_user
 
 appointment_router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -13,13 +15,14 @@ appointment_router = APIRouter(prefix="/appointments", tags=["Appointments"])
 async def get_appointments(
     teacher_name: Optional[str] = None,
     student_name: Optional[str] = None,
-    status_filter: Optional[str] = None
+    status_filter: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
 ):
-    query = Appointment.find_all()
-    if teacher_name:
-        query = query.find(Appointment.teacher_name == teacher_name)
-    if student_name:
-        query = query.find(Appointment.student_name == student_name)
+    query = Appointment.find(
+        Appointment.teacher_name == current_user.name
+        if current_user.role == "teacher"
+        else Appointment.student_email == current_user.email
+    )
     if status_filter:
         query = query.find(Appointment.status == status_filter)
         
@@ -28,22 +31,37 @@ async def get_appointments(
 
 
 @appointment_router.get("/teacher/{teacher_name}", response_model=list[AppointmentResponse])
-async def get_teacher_appointments(teacher_name: str):
-    appointments = await Appointment.find(Appointment.teacher_name == teacher_name).sort("-int_id").to_list()
+async def get_teacher_appointments(
+    teacher_name: str,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "teacher" or teacher_name != current_user.name:
+        raise HTTPException(status_code=403, detail="You can only view your own appointments")
+    appointments = await Appointment.find(Appointment.teacher_name == current_user.name).sort("-int_id").to_list()
     return [AppointmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in appointments]
 
 
 @appointment_router.get("/student/{student_name}", response_model=list[AppointmentResponse])
-async def get_student_appointments(student_name: str):
-    appointments = await Appointment.find(Appointment.student_name == student_name).sort("-int_id").to_list()
+async def get_student_appointments(
+    student_name: str,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "teacher":
+        raise HTTPException(status_code=403, detail="Teachers cannot view a student's private appointments")
+    appointments = await Appointment.find(Appointment.student_email == current_user.email).sort("-int_id").to_list()
     return [AppointmentResponse(**{**a.model_dump(), "id": a.int_id}) for a in appointments]
 
 
 @appointment_router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
-async def create_appointment(payload: AppointmentCreate):
+async def create_appointment(
+    payload: AppointmentCreate,
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == "teacher":
+        raise HTTPException(status_code=403, detail="Only students can create appointment requests")
     appointment = Appointment(
-        student_name=payload.student_name,
-        student_email=payload.student_email,
+        student_name=current_user.name or payload.student_name,
+        student_email=current_user.email,
         teacher_name=payload.teacher_name,
         teacher_department=payload.teacher_department,
         meeting_mode=payload.meeting_mode,
@@ -79,14 +97,17 @@ async def create_appointment(payload: AppointmentCreate):
 @appointment_router.patch("/{appointment_id}/status", response_model=AppointmentResponse)
 async def update_appointment_status(
     appointment_id: int,
-    payload: AppointmentStatusUpdate
+    payload: AppointmentStatusUpdate,
+    current_user: User = Depends(get_current_user),
 ):
     appointment = await Appointment.find_one(Appointment.int_id == appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
+    if current_user.role != "teacher" or appointment.teacher_name != current_user.name:
+        raise HTTPException(status_code=403, detail="You can only manage your own appointments")
 
     appointment.status = payload.status
-    appointment.reviewed_by = payload.reviewed_by
+    appointment.reviewed_by = current_user.name
     appointment.reviewed_at = datetime.utcnow().isoformat(timespec="minutes")
     appointment.rejection_reason = payload.rejection_reason
     appointment.notes = payload.notes
