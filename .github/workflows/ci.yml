@@ -17,6 +17,11 @@ concurrency:
 jobs:
   frontend:
     runs-on: ubuntu-latest
+    env:
+      # CI only needs valid-shaped public configuration to compile the client.
+      # Production Supabase values are supplied by the deployment environment.
+      VITE_SUPABASE_URL: https://ci.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: ci-test-publishable-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
