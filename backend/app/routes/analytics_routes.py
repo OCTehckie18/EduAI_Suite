@@ -99,6 +99,11 @@ async def get_course_analytics(course_id: int):
     
     at_risk_count = 0
     risk_list = []
+    assignment_submission_counts = {}
+    for submission in submissions:
+        if submission.student_name:
+            assignment_submission_counts[submission.student_name] = assignment_submission_counts.get(submission.student_name, 0) + 1
+    assignment_total = len(assignments)
     
     # Identify at-risk students based on BOTH score and attendance
     for s in all_students:
@@ -120,7 +125,7 @@ async def get_course_analytics(course_id: int):
                 "name": s.name,
                 "attendance": s_att,
                 "avgScore": float(s_avg),
-                "assignments": 90, # Placeholder if not tracked specifically
+                "assignments": round((assignment_submission_counts.get(s.name, 0) / assignment_total) * 100, 1) if assignment_total else 0,
                 "risk": int(100 - (s_avg + s_att)/2), 
                 "level": "high" if (s_avg < 40 or s_att < 50) else "moderate"
             })

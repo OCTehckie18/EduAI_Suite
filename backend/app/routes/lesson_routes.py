@@ -11,7 +11,6 @@ from app.schemas.lesson import (
     LessonGenerateRequest
 )
 from app.services.groq_service import GroqService
-from app.utils.auth import get_password_hash
 from app.utils.plan_parser import CoursePlanParser
 from datetime import datetime
 import logging
@@ -47,17 +46,7 @@ async def resolve_creator_id() -> int:
     if existing_user:
         return existing_user.int_id
 
-    placeholder = User(
-        name="EduAI Teacher",
-        email="lesson.teacher@eduai.local",
-        hashed_password=get_password_hash("EduAI123"),
-        role="teacher",
-        department="Computer Science",
-    )
-    await placeholder.assign_id()
-    await placeholder.insert()
-    logger.warning("Created placeholder teacher user for lesson ownership")
-    return placeholder.int_id
+    raise HTTPException(status_code=400, detail="A teacher account is required before creating a lesson")
 
 
 @lesson_router.post("/generate", response_model=dict)

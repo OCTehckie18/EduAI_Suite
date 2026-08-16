@@ -6,6 +6,7 @@ from app.utils.auth import get_current_user
 from app.models.user import User
 from app.models.student import Student
 from app.models.course import Course
+from app.models.submission import Submission
 import PyPDF2
 import docx
 import io
@@ -64,7 +65,7 @@ async def get_exam_stats():
         "total_exams": total_exams,
         "submissions_today": submissions_today,
         "avg_completion": avg_completion,
-        "pending_ai_review": 0 # Placeholder for now
+        "pending_ai_review": sum(1 for submission in await Submission.find(Submission.grade == None).to_list())
     }
 
 @exam_router.get("/", response_model=List[ExamResponse])
