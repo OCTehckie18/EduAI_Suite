@@ -5,10 +5,12 @@ and custom teacher events into a unified calendar feed.
 
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.models.calendar import CalendarEvent
+from app.models.user import User
+from app.utils.auth import get_current_user
 
 # ── Pydantic Schemas ─────────────────────────────────────────
 class CalendarEventCreate(BaseModel):
@@ -73,6 +75,7 @@ async def get_calendar_events(
     end: Optional[str] = None,
     teacher_name: Optional[str] = None,
     student_email: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
 ):
     """
     Return all calendar events (custom + aggregated from other tables)
@@ -88,9 +91,12 @@ async def get_calendar_events(
     range_start = _parse_date_safe(start) if start else datetime.utcnow() - timedelta(days=90)
     range_end = _parse_date_safe(end) if end else datetime.utcnow() + timedelta(days=90)
 
+    is_teacher = current_user.role == "teacher"
+    # Identity and visibility are derived from the token, never from query params.
+    scoped_email = current_user.email
     student_course_ids = []
-    if student_email:
-        student_records = await Student.find(Student.email == student_email).to_list()
+    if not is_teacher:
+        student_records = await Student.find(Student.email == scoped_email).to_list()
         student_course_ids = [s.course_id for s in student_records if s.course_id]
 
     events: List[dict] = []
@@ -101,11 +107,10 @@ async def get_calendar_events(
         custom_query = custom_query.find(CalendarEvent.start_time >= range_start)
     if range_end:
         custom_query = custom_query.find(CalendarEvent.start_time <= range_end)
-    if teacher_name:
+    if is_teacher and teacher_name:
         custom_query = custom_query.find(CalendarEvent.teacher_name == teacher_name)
-    # Omit strict student_email filtering for custom events for demo reliability
-    # if student_email:
-    #     custom_query = custom_query.find(CalendarEvent.student_email == student_email)
+    elif not is_teacher:
+        custom_query = custom_query.find(CalendarEvent.student_email == scoped_email)
 
     custom_events = await custom_query.to_list()
     for ev in custom_events:
@@ -138,9 +143,9 @@ async def get_calendar_events(
         if range_end and dt > range_end:
             continue
         course = courses_map.get(assg.course_id)
-        if teacher_name and course and course.teacher_name != teacher_name:
+        if is_teacher and teacher_name and course and course.teacher_name != teacher_name:
             continue
-        if student_email and assg.course_id not in student_course_ids:
+        if not is_teacher and assg.course_id not in student_course_ids:
             continue
         events.append({
             "id": f"assignment-{assg.int_id}",
@@ -168,9 +173,9 @@ async def get_calendar_events(
         if range_end and dt > range_end:
             continue
         course = courses_map.get(exam.course_id)
-        if teacher_name and course and course.teacher_name != teacher_name:
+        if is_teacher and teacher_name and course and course.teacher_name != teacher_name:
             continue
-        if student_email and exam.course_id not in student_course_ids:
+        if not is_teacher and exam.course_id not in student_course_ids:
             continue
         events.append({
             "id": f"exam-{exam.int_id}",
@@ -204,11 +209,10 @@ async def get_calendar_events(
             continue
         if range_end and dt > range_end:
             continue
-        if teacher_name and appt.teacher_name != teacher_name:
+        if is_teacher and teacher_name and appt.teacher_name != teacher_name:
             continue
-        # Omit strict student_email filtering for single-tenant demo reliability
-        # if student_email and appt.student_email != student_email:
-        #     continue
+        if not is_teacher and appt.student_email != scoped_email:
+            continue
         status_colors = {"pending": "#d97706", "approved": "#16a34a", "rejected": "#dc2626"}
         events.append({
             "id": f"appointment-{appt.int_id}",
@@ -237,9 +241,9 @@ async def get_calendar_events(
         if range_end and dt > range_end:
             continue
         course = courses_map.get(lesson.course_id)
-        if teacher_name and course and course.teacher_name != teacher_name:
+        if is_teacher and teacher_name and course and course.teacher_name != teacher_name:
             continue
-        if student_email and lesson.course_id not in student_course_ids:
+        if not is_teacher and lesson.course_id not in student_course_ids:
             continue
         events.append({
             "id": f"lesson-{lesson.int_id}",
@@ -262,7 +266,10 @@ async def get_calendar_events(
 
 
 @calendar_router.post("/events")
-async def create_calendar_event(payload: CalendarEventCreate):
+async def create_calendar_event(
+    payload: CalendarEventCreate,
+    current_user: User = Depends(get_current_user),
+):
     """Create a new custom calendar event."""
     start_dt = _parse_date_safe(payload.start_time)
     end_dt = _parse_date_safe(payload.end_time)
@@ -279,8 +286,8 @@ async def create_calendar_event(payload: CalendarEventCreate):
         location=payload.location,
         is_all_day=payload.is_all_day,
         recurrence=payload.recurrence,
-        teacher_name=payload.teacher_name,
-        student_email=payload.student_email,
+        teacher_name=payload.teacher_name if current_user.role == "teacher" else None,
+        student_email=payload.student_email if current_user.role == "teacher" else current_user.email,
         course_id=payload.course_id,
     )
     await event.assign_id()
@@ -300,11 +307,17 @@ async def create_calendar_event(payload: CalendarEventCreate):
 
 
 @calendar_router.put("/events/{event_id}")
-async def update_calendar_event(event_id: int, payload: CalendarEventUpdate):
+async def update_calendar_event(
+    event_id: int,
+    payload: CalendarEventUpdate,
+    current_user: User = Depends(get_current_user),
+):
     """Update a custom calendar event."""
     event = await CalendarEvent.find_one(CalendarEvent.int_id == event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    if current_user.role != "teacher" and event.student_email != current_user.email:
+        raise HTTPException(status_code=403, detail="You can only update your own calendar events")
 
     if payload.title is not None:
         event.title = payload.title
@@ -328,9 +341,9 @@ async def update_calendar_event(event_id: int, payload: CalendarEventUpdate):
         event.is_all_day = payload.is_all_day
     if payload.recurrence is not None:
         event.recurrence = payload.recurrence
-    if payload.teacher_name is not None:
+    if current_user.role == "teacher" and payload.teacher_name is not None:
         event.teacher_name = payload.teacher_name
-    if payload.student_email is not None:
+    if current_user.role == "teacher" and payload.student_email is not None:
         event.student_email = payload.student_email
     if payload.course_id is not None:
         event.course_id = payload.course_id
@@ -350,17 +363,26 @@ async def update_calendar_event(event_id: int, payload: CalendarEventUpdate):
 
 
 @calendar_router.delete("/events/{event_id}")
-async def delete_calendar_event(event_id: int):
+async def delete_calendar_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+):
     """Delete a custom calendar event."""
     event = await CalendarEvent.find_one(CalendarEvent.int_id == event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    if current_user.role != "teacher" and event.student_email != current_user.email:
+        raise HTTPException(status_code=403, detail="You can only delete your own calendar events")
     await event.delete()
     return {"deleted": True, "id": event_id}
 
 
 @calendar_router.get("/notifications")
-async def get_calendar_notifications(teacher_name: Optional[str] = None, student_email: Optional[str] = None):
+async def get_calendar_notifications(
+    teacher_name: Optional[str] = None,
+    student_email: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
     """
     Return events happening tomorrow (24h window) for in-app reminders.
     Aggregates from all sources just like /events.
@@ -377,9 +399,11 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
     tomorrow_start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow_end = tomorrow_start + timedelta(days=1)
 
+    is_teacher = current_user.role == "teacher"
+    scoped_email = current_user.email
     student_course_ids = []
-    if student_email:
-        student_records = await Student.find(Student.email == student_email).to_list()
+    if not is_teacher:
+        student_records = await Student.find(Student.email == scoped_email).to_list()
         student_course_ids = [s.course_id for s in student_records if s.course_id]
 
     notifications: List[dict] = []
@@ -389,8 +413,10 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
         CalendarEvent.start_time >= tomorrow_start,
         CalendarEvent.start_time < tomorrow_end,
     )
-    if teacher_name:
+    if is_teacher and teacher_name:
         custom_query = custom_query.find(CalendarEvent.teacher_name == teacher_name)
+    elif not is_teacher:
+        custom_query = custom_query.find(CalendarEvent.student_email == scoped_email)
         
     custom_events = await custom_query.to_list()
     for ev in custom_events:
@@ -413,9 +439,9 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
         dt = _parse_date_safe(assg.due_date) if assg.due_date else None
         if dt and tomorrow_start <= dt < tomorrow_end:
             course = courses_map.get(assg.course_id)
-            if teacher_name and course and course.teacher_name != teacher_name:
+            if is_teacher and teacher_name and course and course.teacher_name != teacher_name:
                 continue
-            if student_email and assg.course_id not in student_course_ids:
+            if not is_teacher and assg.course_id not in student_course_ids:
                 continue
             notifications.append({
                 "id": f"assignment-{assg.int_id}",
@@ -433,9 +459,9 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
         dt = exam.created_at
         if dt and tomorrow_start <= dt < tomorrow_end:
             course = courses_map.get(exam.course_id)
-            if teacher_name and course and course.teacher_name != teacher_name:
+            if is_teacher and teacher_name and course and course.teacher_name != teacher_name:
                 continue
-            if student_email and exam.course_id not in student_course_ids:
+            if not is_teacher and exam.course_id not in student_course_ids:
                 continue
             notifications.append({
                 "id": f"exam-{exam.int_id}",
@@ -457,9 +483,9 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
         if dt and tomorrow_start <= dt < tomorrow_end:
             if appt.status == "rejected":
                 continue
-            if teacher_name and appt.teacher_name != teacher_name:
+            if is_teacher and teacher_name and appt.teacher_name != teacher_name:
                 continue
-            if student_email and appt.student_email != student_email:
+            if not is_teacher and appt.student_email != scoped_email:
                 continue
             notifications.append({
                 "id": f"appointment-{appt.int_id}",
@@ -477,9 +503,9 @@ async def get_calendar_notifications(teacher_name: Optional[str] = None, student
         dt = lesson.posted_at or lesson.created_at
         if dt and tomorrow_start <= dt < tomorrow_end:
             course = courses_map.get(lesson.course_id)
-            if teacher_name and course and course.teacher_name != teacher_name:
+            if is_teacher and teacher_name and course and course.teacher_name != teacher_name:
                 continue
-            if student_email and lesson.course_id not in student_course_ids:
+            if not is_teacher and lesson.course_id not in student_course_ids:
                 continue
             notifications.append({
                 "id": f"lesson-{lesson.int_id}",
