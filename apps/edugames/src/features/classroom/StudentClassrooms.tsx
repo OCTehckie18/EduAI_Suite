@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AlertCircle,
   BookOpen,
@@ -86,6 +87,7 @@ const getFileUrl = (path?: string | null) => {
 };
 
 export const StudentClassrooms: React.FC = () => {
+  const location = useLocation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -294,6 +296,14 @@ export const StudentClassrooms: React.FC = () => {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    const requestedJoinCode = (location.state as { joinCode?: string } | null)?.joinCode;
+    if (requestedJoinCode) {
+      setJoinCode(requestedJoinCode.toUpperCase());
+      setShowJoinModal(true);
+    }
+  }, [location.state]);
 
   const filteredCourses = courses.filter(course =>
     `${course.code} ${course.name} ${course.batch} ${course.teacher_name || ""}`.toLowerCase().includes(search.toLowerCase()),

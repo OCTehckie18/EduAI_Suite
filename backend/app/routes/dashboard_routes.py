@@ -318,6 +318,24 @@ async def get_dashboard_summary(teacher_name: Optional[str] = None):
         "schedule": schedule
     }
 
+@dashboard_router.get("/discoverable-classrooms")
+async def get_discoverable_classrooms():
+    """Return classrooms that students can discover and join from EduGames."""
+    courses = await Course.find_all().to_list()
+    discoverable = [course for course in courses if course.enrollment_code]
+
+    classrooms = []
+    for course in discoverable:
+        classroom = course.model_dump()
+        classroom["id"] = course.int_id
+        classroom["students"] = await Student.find(Student.course_id == course.int_id).count()
+        classroom["progress"] = 0
+        classroom["color"] = classroom.get("color") or "#264796"
+        classroom["description"] = classroom.get("description") or ""
+        classrooms.append(classroom)
+    return classrooms
+
+
 @dashboard_router.get("/student-summary")
 async def get_student_dashboard_summary(student_name: str = "Aarav Gupta"):
     # 1. Student Info & Stats
