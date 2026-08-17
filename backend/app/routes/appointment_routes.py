@@ -29,7 +29,9 @@ async def get_appointments(
         query = query.find(Appointment.status == status_filter)
         
     appointments = await query.sort("-int_id").to_list()
-    if current_user.role == "teacher":
+    if current_user.role == "admin":
+        pass
+    elif current_user.role == "teacher":
         appointments = [a for a in appointments if _same_identity(a.teacher_name, current_user.name)]
     else:
         appointments = [a for a in appointments if a.student_email == current_user.email]
