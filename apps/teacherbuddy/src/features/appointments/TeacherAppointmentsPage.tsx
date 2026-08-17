@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { supabase } from "../../lib/supabase";
+import { useAuthStore } from "../../store/useAuthStore";
 
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
@@ -132,6 +133,7 @@ const statusCopy: Record<AppointmentStatus, { label: string; color: string; bg: 
 };
 
 export const TeacherAppointmentsPage: React.FC = () => {
+  const authUser = useAuthStore((state) => state.user);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +148,12 @@ export const TeacherAppointmentsPage: React.FC = () => {
   const [rejectionReasonInput, setRejectionReasonInput] = useState("");
   const [suggestedDate, setSuggestedDate] = useState("");
   const [suggestedTime, setSuggestedTime] = useState("");
+
+  useEffect(() => {
+    if (authUser?.role === "teacher" && authUser.name) {
+      setSelectedTeacher(authUser.name);
+    }
+  }, [authUser?.name, authUser?.role]);
 
   const teacherOptions = useMemo(() => {
     const names = new Set<string>();
@@ -189,20 +197,25 @@ export const TeacherAppointmentsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedTeacher]);
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   useEffect(() => {
-    if (selectedTeacher !== "All Teachers" && !teacherOptions.includes(selectedTeacher)) {
+    if (authUser?.role !== "teacher" && selectedTeacher !== "All Teachers" && !teacherOptions.includes(selectedTeacher)) {
       setSelectedTeacher("All Teachers");
     }
-  }, [selectedTeacher, teacherOptions]);
+  }, [authUser?.role, selectedTeacher, teacherOptions]);
+
+  const teacherAppointments = useMemo(() => appointments.filter((appointment) => (
+    selectedTeacher === "All Teachers"
+      || appointment.teacher_name.trim().toLowerCase() === selectedTeacher.trim().toLowerCase()
+  )), [appointments, selectedTeacher]);
 
   const filteredAppointments = useMemo(() => {
-    return appointments
+    return teacherAppointments
       .filter((appointment) => statusTab === "all" ? true : appointment.status === statusTab)
       .filter((appointment) => {
         const query = search.trim().toLowerCase();
@@ -216,7 +229,7 @@ export const TeacherAppointmentsPage: React.FC = () => {
           appointment.time_slot,
         ].some((value) => value.toLowerCase().includes(query));
       });
-  }, [appointments, search, statusTab]);
+  }, [search, statusTab, teacherAppointments]);
 
   useEffect(() => {
     if (!filteredAppointments.some((appointment) => appointment.id === selectedId)) {
@@ -227,11 +240,11 @@ export const TeacherAppointmentsPage: React.FC = () => {
   const selectedAppointment = filteredAppointments.find((appointment) => appointment.id === selectedId) ?? filteredAppointments[0] ?? null;
 
   const counts = useMemo(() => ({
-    total: appointments.length,
-    pending: appointments.filter((appointment) => appointment.status === "pending").length,
-    approved: appointments.filter((appointment) => appointment.status === "approved").length,
-    rejected: appointments.filter((appointment) => appointment.status === "rejected").length,
-  }), [appointments]);
+    total: teacherAppointments.length,
+    pending: teacherAppointments.filter((appointment) => appointment.status === "pending").length,
+    approved: teacherAppointments.filter((appointment) => appointment.status === "approved").length,
+    rejected: teacherAppointments.filter((appointment) => appointment.status === "rejected").length,
+  }), [teacherAppointments]);
 
   const respondToAppointment = async (appointment: Appointment, status: AppointmentStatus, rejectionReason?: string) => {
     setActioningId(appointment.id);
@@ -417,6 +430,23 @@ export const TeacherAppointmentsPage: React.FC = () => {
             {tab.label}
           </button>
         ))}
+        {authUser?.role !== "teacher" && (
+          <label className="ml-2">
+            <span className="sr-only">Filter by teacher</span>
+            <select
+              value={selectedTeacher}
+              onChange={(event) => setSelectedTeacher(event.target.value)}
+              className="rounded-full px-4 py-2 text-sm font-semibold outline-none"
+              style={{
+                background: "var(--color-surface-base)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              {teacherOptions.map((teacher) => <option key={teacher} value={teacher}>{teacher}</option>)}
+            </select>
+          </label>
+        )}
         <button
           onClick={fetchData}
           className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all"
