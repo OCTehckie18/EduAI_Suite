@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { supabase } from "../../lib/supabase";
 
 const get_user = () => {
   const storedUser = localStorage.getItem("user");
@@ -23,6 +24,19 @@ const get_user = () => {
 
 const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}`;
 const CURRENT_STUDENT = get_user()?.name || "Student";
+
+const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const storedToken = localStorage.getItem("token");
+  if (storedToken) return { Authorization: `Bearer ${storedToken}` };
+
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (accessToken) {
+    localStorage.setItem("token", accessToken);
+    return { Authorization: `Bearer ${accessToken}` };
+  }
+  return {};
+};
 
 type AppointmentMode = "In-person" | "Online";
 type AppointmentStatus = "pending" | "approved" | "rejected";
@@ -164,10 +178,9 @@ export const AppointmentBookingPage: React.FC = () => {
     setSyncError(null);
 
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const headers = await getAuthHeaders();
       const [courseResponse, appointmentResponse] = await Promise.all([
-        fetch(`${API_URL}/courses/`),
+        fetch(`${API_URL}/courses/`, { headers }),
         fetch(`${API_URL}/appointments/student/${encodeURIComponent(CURRENT_STUDENT)}`, { headers }),
       ]);
 
@@ -216,9 +229,7 @@ export const AppointmentBookingPage: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(localStorage.getItem("token")
-            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
-            : {}),
+          ...(await getAuthHeaders()),
         },
         body: JSON.stringify({
           student_name: CURRENT_STUDENT,
