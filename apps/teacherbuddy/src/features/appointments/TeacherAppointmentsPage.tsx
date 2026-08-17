@@ -15,10 +15,24 @@ import {
   MessageSquareText,
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
+import { supabase } from "../../lib/supabase";
 
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 const API_URL = API_ENDPOINTS.BASE;
+
+const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const storedToken = localStorage.getItem("token");
+  if (storedToken) return { Authorization: `Bearer ${storedToken}` };
+
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (accessToken) {
+    localStorage.setItem("token", accessToken);
+    return { Authorization: `Bearer ${accessToken}` };
+  }
+  return {};
+};
 
 type AppointmentStatus = "pending" | "approved" | "rejected";
 
@@ -149,12 +163,11 @@ export const TeacherAppointmentsPage: React.FC = () => {
     setError(null);
 
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const headers = await getAuthHeaders();
 
       const [appointmentsResponse, coursesResponse] = await Promise.all([
         fetch(`${API_URL}/appointments/`, { headers }),
-        fetch(`${API_URL}/courses/`),
+        fetch(`${API_URL}/courses/`, { headers }),
       ]);
 
       if (!appointmentsResponse.ok) {
@@ -227,9 +240,7 @@ export const TeacherAppointmentsPage: React.FC = () => {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...(localStorage.getItem("token")
-            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
-            : {}),
+          ...(await getAuthHeaders()),
         },
         body: JSON.stringify({
           status,
