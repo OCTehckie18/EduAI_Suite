@@ -126,6 +126,11 @@ export const ClassroomsPage: React.FC = () => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [coursePlanFile, setCoursePlanFile] = useState<File | null>(null);
 
+  const authHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem("token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   const [studentForm, setStudentForm] = useState({
     name: "",
     email: "",
@@ -154,7 +159,7 @@ export const ClassroomsPage: React.FC = () => {
 
   const fetchCourses = async () => {
     try {
-      const res = await fetch(`${API_URL}/courses/`);
+      const res = await fetch(`${API_URL}/courses/`, { headers: authHeaders() });
       const data = await res.json();
       if (Array.isArray(data)) {
         setClassrooms(data);
@@ -171,9 +176,9 @@ export const ClassroomsPage: React.FC = () => {
     if (!selectedId) return;
     try {
       const [ann, stu, asgn] = await Promise.all([
-        fetch(`${API_URL}/announcements/${selectedId}`).then((r) => r.json()),
-        fetch(`${API_URL}/students/${selectedId}`).then((r) => r.json()),
-        fetch(`${API_URL}/assignments/${selectedId}`).then((r) => r.json()),
+        fetch(`${API_URL}/announcements/${selectedId}`, { headers: authHeaders() }).then((r) => r.json()),
+        fetch(`${API_URL}/students/${selectedId}`, { headers: authHeaders() }).then((r) => r.json()),
+        fetch(`${API_URL}/assignments/${selectedId}`, { headers: authHeaders() }).then((r) => r.json()),
       ]);
       const sortedAnnouncements = Array.isArray(ann)
         ? ann.sort((a, b) => {
@@ -379,7 +384,7 @@ export const ClassroomsPage: React.FC = () => {
     if (coursePlanFile) formData.append("file", coursePlanFile);
 
     handleApiCall(
-      () => fetch(`${API_URL}/courses/`, { method: "POST", body: formData }),
+      () => fetch(`${API_URL}/courses/`, { method: "POST", headers: authHeaders(), body: formData }),
       () => {
         setShowCourseModal(false);
         resetCourseForm();
@@ -602,7 +607,7 @@ export const ClassroomsPage: React.FC = () => {
 
     const { type, id } = deleteConfirm;
     const actionMap: Record<string, () => Promise<Response>> = {
-      course: () => fetch(`${API_URL}/courses/${id}`, { method: "DELETE" }),
+      course: () => fetch(`${API_URL}/courses/${id}`, { method: "DELETE", headers: authHeaders() }),
       announcement: () =>
         fetch(`${API_URL}/announcements/${id}`, { method: "DELETE" }),
       student: () => fetch(`${API_URL}/students/${id}`, { method: "DELETE" }),
