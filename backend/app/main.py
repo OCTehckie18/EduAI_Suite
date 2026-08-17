@@ -47,6 +47,12 @@ app.mount("/local_uploads", StaticFiles(directory=local_uploads_dir),
 app.include_router(course_routes.course_router)
 app.include_router(announcement_routes.announcement_router)
 app.include_router(resource_routes.resource_router)
+app.include_router(student_routes.student_router)
+app.include_router(assignment_routes.assignment_router)
+app.include_router(submission_routes.submission_router)
+app.include_router(appointment_routes.appointment_router)
+app.include_router(exam_routes.exam_router)
+app.include_router(game_routes.game_router)
 app.include_router(lesson_routes.lesson_router)
 app.include_router(engagement_routes.engagement_router)
 app.include_router(analytics_routes.analytics_router)
@@ -72,12 +78,6 @@ class AIChatRequest(BaseModel):
 
 @app.get("/")
 def root():
-    app.include_router(student_routes.student_router)
-    app.include_router(assignment_routes.assignment_router)
-    app.include_router(submission_routes.submission_router)
-    app.include_router(appointment_routes.appointment_router)
-    app.include_router(exam_routes.exam_router)
-    app.include_router(game_routes.game_router)
     return {"message": "EduAI Backend Running"}
 
 
