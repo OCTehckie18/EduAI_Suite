@@ -13,7 +13,7 @@ services:
       retries: 10
 
   backend:
-    image: omkaartehckie/eduai-suite:development
+    image: omkaartehckie/eduai-suite:${BACKEND_IMAGE_TAG:-development}
     build:
       context: ./backend
       dockerfile: Dockerfile
