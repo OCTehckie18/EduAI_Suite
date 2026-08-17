@@ -112,7 +112,10 @@ async def update_appointment_status(
     appointment = await Appointment.find_one(Appointment.int_id == appointment_id)
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
-    if current_user.role != "teacher" or not _same_identity(appointment.teacher_name, current_user.name):
+    if current_user.role != "admin" and (
+        current_user.role != "teacher"
+        or not _same_identity(appointment.teacher_name, current_user.name)
+    ):
         raise HTTPException(status_code=403, detail="You can only manage your own appointments")
 
     appointment.status = payload.status
