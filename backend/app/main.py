@@ -1,4 +1,12 @@
 from dotenv import load_dotenv
+from pathlib import Path
+
+# Load the normal backend environment, then apply machine-local overrides.
+# `.env.local` is ignored by git and is never used in deployments unless
+# explicitly created there.
+load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env.local", override=True)
+
 from contextlib import asynccontextmanager
 from app.services.groq_service import GroqService, DEFAULT_MODEL
 from app.routes import course_routes, announcement_routes, resource_routes, student_routes, assignment_routes, submission_routes, appointment_routes, exam_routes, game_routes, websocket_routes, lesson_routes, engagement_routes, analytics_routes, calendar_routes, mail_routes, quiz_routes, omr_routes, wordcloud_routes, report_routes, slido_routes, history_routes, dashboard_routes, trello_routes, google_auth_routes, admin_routes
@@ -10,9 +18,6 @@ from app.database import init_db
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
-
-# Load environment variables FIRST
-load_dotenv()
 
 uploads_dir = os.path.abspath(os.path.join(
     os.path.dirname(__file__), "..", "uploads"))
