@@ -19,6 +19,8 @@ class CalendarEvent(Document):
     teacher_name: Optional[str] = None
     student_email: Optional[str] = None
     course_id: Optional[int] = None
+    google_event_id: Optional[str] = None
+    google_calendar_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
