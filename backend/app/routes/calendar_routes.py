@@ -116,6 +116,7 @@ async def get_calendar_events(
     range_end = _parse_date_safe(end) if end else datetime.utcnow() + timedelta(days=90)
 
     is_teacher = current_user.role == "teacher"
+    is_admin = current_user.role == "admin"
     # Identity and visibility are derived from the token, never from query params.
     scoped_email = current_user.email
     scoped_teacher_name = current_user.name
@@ -259,7 +260,7 @@ async def get_calendar_events(
                     scoped_teacher_name,
                 )
                 continue
-        if not is_teacher and appt.student_email != scoped_email:
+        if not is_teacher and not is_admin and appt.student_email != scoped_email:
             continue
         status_colors = {"pending": "#d97706", "approved": "#16a34a", "rejected": "#dc2626"}
         events.append({
