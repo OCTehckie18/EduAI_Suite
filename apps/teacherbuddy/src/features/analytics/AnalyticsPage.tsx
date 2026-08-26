@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const API_BASE = API_ENDPOINTS.BASE;
 
@@ -78,6 +79,7 @@ const RiskCell: React.FC<{ value: number; label: string }> = ({ value, label }) 
 };
 
 export const AnalyticsPage: React.FC = () => {
+  const authUser = useAuthStore((state) => state.user);
   // 1. Determine if this is a reload and get persisted state immediately
   const persisted = useMemo(() => {
     const navEntries = performance.getEntriesByType("navigation");
@@ -151,7 +153,7 @@ export const AnalyticsPage: React.FC = () => {
 
   // Fetch analytics when course changes
   useEffect(() => {
-    if (selectedCourseId && dataSource === "platform") {
+    if (activeTab !== "risk" && selectedCourseId && dataSource === "platform") {
       // Prevent redundant fetch if we already have the data for this course from session
       if (analytics && selectedCourseId === lastFetchedCourseId.current) {
         return;
@@ -170,7 +172,29 @@ export const AnalyticsPage: React.FC = () => {
           setLoading(false);
         });
     }
-  }, [selectedCourseId, dataSource]);
+  }, [selectedCourseId, dataSource, activeTab]);
+
+  // Risk intelligence is intentionally global: course selection must not scope this tab.
+  useEffect(() => {
+    if (activeTab !== "risk" || dataSource !== "platform") return;
+    const teacherName = authUser?.name || authUser?.email;
+    if (!teacherName) return;
+    setLoading(true);
+    fetch(`${API_BASE}/analytics/risk-global?teacher_name=${encodeURIComponent(teacherName)}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch global risk intelligence");
+        return res.json();
+      })
+      .then(data => {
+        setAnalytics(data);
+        lastFetchedCourseId.current = null;
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching global risk intelligence:", err);
+        setLoading(false);
+      });
+  }, [activeTab, dataSource, authUser?.name, authUser?.email]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -539,7 +563,7 @@ export const AnalyticsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-900 to-blue-600 bg-clip-text text-transparent" style={{ fontFamily: "var(--font-display)" }}>
-            Risk Intelligence Dashboard
+            {activeTab === "risk" ? "Global Risk Intelligence" : "Risk Intelligence Dashboard"}
           </h1>
           <p className="text-sm text-slate-500 mt-1">Real-time performance monitoring and predictive risk analytics.</p>
         </div>
@@ -593,7 +617,11 @@ export const AnalyticsPage: React.FC = () => {
       {/* Control Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-y border-slate-100">
         <div className="flex items-center gap-3">
-          {dataSource === "platform" ? (
+          {dataSource === "platform" && activeTab === "risk" ? (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-700 text-sm font-bold">
+              <AlertTriangle size={16} /> All Courses
+            </div>
+          ) : dataSource === "platform" ? (
             <>
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Selected Course:</span>
               <div className="relative">
@@ -625,7 +653,15 @@ export const AnalyticsPage: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button onClick={() => {
-            if (dataSource === "platform" && selectedCourseId) {
+            if (dataSource === "platform" && activeTab === "risk") {
+              const teacherName = authUser?.name || authUser?.email;
+              if (!teacherName) return;
+              setLoading(true);
+              fetch(`${API_BASE}/analytics/risk-global?teacher_name=${encodeURIComponent(teacherName)}`)
+                .then(res => res.json())
+                .then(data => { setAnalytics(data); lastFetchedCourseId.current = null; setLoading(false); })
+                .catch(() => setLoading(false));
+            } else if (dataSource === "platform" && selectedCourseId) {
               setLoading(true);
               fetch(`${API_BASE}/analytics/course/${selectedCourseId}`)
                 .then(res => res.json())
