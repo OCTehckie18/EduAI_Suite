@@ -78,7 +78,7 @@ SELECTED STUDENTS:
 
 Rules:
 - Do not invent facts or student-specific claims.
-- Use {{name}}, {{attendance}}, and {{marks}} placeholders when personalization is useful.
+- Use {{{{name}}}}, {{{{attendance}}}}, and {{{{marks}}}} placeholders when personalization is useful.
 - Keep the subject concise and the body clear, respectful, and ready to send.
 - Mention the pattern represented by the query conditions, not unrelated platform details.
 """
@@ -368,10 +368,20 @@ async def send_bulk_mail(req: SendMailRequest, background_tasks: BackgroundTasks
         await history.insert()
         
         for student in all_students_data:
-            personalized_body = mail_item["body"].replace("{{name}}", student["name"]) \
-                                        .replace("{{reg_num}}", student["registration_number"]) \
-                                        .replace("{{attendance}}", f"{student['attendance']}%") \
-                                        .replace("{{marks}}", f"{student['avg_score']}%")
+            replacements = {
+                "name": student["name"] or "",
+                "reg_num": student["registration_number"] or "",
+                "attendance": f"{student['attendance']}%",
+                "marks": f"{student['avg_score']}%",
+            }
+            personalized_body = mail_item["body"]
+            for token, value in replacements.items():
+                personalized_body = re.sub(
+                    r"\{\{?\s*" + re.escape(token) + r"\s*\}?\}",
+                    lambda _match, replacement=value: replacement,
+                    personalized_body,
+                    flags=re.IGNORECASE,
+                )
             
             background_tasks.add_task(send_email, student["email"], mail_item["subject"], personalized_body)
             sent_count += 1

@@ -393,10 +393,9 @@ export const MailStudentsPage: React.FC = () => {
       return;
     }
     const sourceStudents = dataSource === 'upload' ? uploadedData : students;
-    const recipients = sourceStudents
+    const selectedRecords = sourceStudents
       .filter(student => selectedStudents.includes(student.id) && student.email?.trim())
-      .map(student => student.email.trim());
-    if (!recipients.length) {
+    if (!selectedRecords.length) {
       setStatus({ type: 'error', message: "Selected students do not have email addresses." });
       return;
     }
@@ -409,8 +408,23 @@ export const MailStudentsPage: React.FC = () => {
       return;
     }
 
+    const personalize = (text: string, student: Student) => text
+      .replace(/\{\{?\s*name\s*\}?\}/gi, student.name || "")
+      .replace(/\{\{?\s*reg(?:istration)?(?:_num|_number| number|_no)?\s*\}?\}/gi, student.registration_number || "")
+      .replace(/\{\{?\s*attendance\s*\}?\}/gi, `${student.attendance ?? ""}`)
+      .replace(/\{\{?\s*(?:marks|avg_score)\s*\}?\}/gi, `${student.avg_score ?? ""}`);
+    const hasPersonalization = mailItems.some(item => /\{\{?\s*(?:name|reg|registration|attendance|marks|avg_score)\b[^}]*\}?\}/i.test(`${item.subject} ${item.body}`));
+    const recipients = selectedRecords.map(student => student.email.trim());
     const batches: Array<{ subject: string; body: string; recipients: string[] }> = [];
     for (const item of mailItems) {
+      if (hasPersonalization) {
+        selectedRecords.forEach(student => batches.push({
+          subject: personalize(item.subject, student),
+          body: personalize(item.body, student),
+          recipients: [student.email.trim()],
+        }));
+        continue;
+      }
       let current: string[] = [];
       for (const recipient of recipients) {
         const candidate = [...current, recipient];
