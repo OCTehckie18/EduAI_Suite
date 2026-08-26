@@ -5,6 +5,8 @@ and returns a JWT with user status for the approval workflow.
 """
 
 import os
+import secrets
+from urllib.parse import urlencode
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,6 +20,9 @@ from app.schemas.user_schema import GoogleLoginRequest, GoogleToken
 from app.utils.auth import create_access_token, get_current_user
 from app.services.supabase_auth import supabase_auth_verifier
 from app.utils.role_detection import detect_role_from_email
+from app.services.google_calendar_service import CALENDAR_SCOPE, GoogleCalendarService
+from jose import jwt, JWTError
+from app.utils.auth import SECRET_KEY, ALGORITHM
 
 google_auth_router = APIRouter(prefix="/auth", tags=["auth"])
 supabase_bearer = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -28,6 +33,82 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 class ProfileUpdateRequest(BaseModel):
     registration_number: Optional[str] = None
     department: Optional[str] = None
+
+
+def _calendar_redirect_uri() -> str:
+    return os.getenv("GOOGLE_CALENDAR_REDIRECT_URI", "http://localhost:8000/auth/google-calendar/callback")
+
+
+@google_auth_router.get("/google-calendar/connect")
+async def connect_google_calendar(current_user: User = Depends(get_current_user)):
+    """Return a short-lived Google consent URL for Calendar access."""
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=503, detail="Google Calendar OAuth is not configured")
+    state = jwt.encode(
+        {"email": current_user.email, "nonce": secrets.token_urlsafe(16), "exp": datetime.utcnow().timestamp() + 600},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+    params = {
+        "client_id": client_id,
+        "redirect_uri": _calendar_redirect_uri(),
+        "response_type": "code",
+        "scope": CALENDAR_SCOPE,
+        "access_type": "offline",
+        "prompt": "consent",
+        "include_granted_scopes": "true",
+        "state": state,
+    }
+    return {"authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)}
+
+
+@google_auth_router.get("/google-calendar/callback")
+async def google_calendar_callback(code: str, state: str):
+    """Exchange the authorization code and persist only the refresh token."""
+    try:
+        payload = jwt.decode(state, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("email")
+    except JWTError as exc:
+        raise HTTPException(status_code=400, detail="Invalid or expired Calendar OAuth state") from exc
+
+    import requests
+    token_response = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code": code,
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+            "redirect_uri": _calendar_redirect_uri(),
+            "grant_type": "authorization_code",
+        },
+        timeout=30,
+    )
+    if not token_response.ok:
+        raise HTTPException(status_code=400, detail="Google Calendar authorization failed")
+    refresh_token = token_response.json().get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Google did not return a refresh token; reconnect and approve Calendar access")
+    user = await User.find_one(User.email == email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found")
+    user.google_refresh_token = refresh_token
+    user.google_calendar_synced = False
+    await user.save()
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(f"{frontend_url.rstrip('/')}/calendar?google_calendar=connected")
+
+
+@google_auth_router.post("/google-calendar/sync")
+async def sync_google_calendar(current_user: User = Depends(get_current_user)):
+    try:
+        return await GoogleCalendarService().sync_bidirectional(current_user)
+    except Exception as exc:
+        if "not connected" in str(exc).lower() or "not configured" in str(exc).lower():
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=f"Google Calendar sync failed: {exc}") from exc
 
 
 @google_auth_router.patch("/profile")
