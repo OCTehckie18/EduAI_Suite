@@ -35,6 +35,15 @@ def _generate_engagement_summary(student_name: str, engagement_data: dict) -> st
     exams = engagement_data.get("exams", {})
     games = engagement_data.get("games", {})
 
+    has_data = (
+        attendance > 0
+        or assign.get("submitted", 0) > 0
+        or exams.get("total_attempts", 0) > 0
+        or games.get("sessions_played", 0) > 0
+    )
+    if not has_data:
+        return ""
+
     parts = []
 
     # ── Engagement overview (with varied intros) ──────────────

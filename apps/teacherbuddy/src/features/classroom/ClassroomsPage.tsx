@@ -2304,7 +2304,7 @@ export const ClassroomsPage: React.FC = () => {
                       </div>
 
                       {/* Engagement Summary Card */}
-                      {(studentProfileData.engagement_summary || studentProfileData.ai_summary) && (
+                      {studentProfileData.engagement_summary && (
                         <div className="p-5 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50 shadow-sm">
                           <div className="flex items-center gap-2.5 mb-3">
                             <div className="p-1.5 bg-gradient-to-br from-slate-600 to-blue-700 rounded-lg shadow-md shadow-slate-300/40">
@@ -2315,7 +2315,7 @@ export const ClassroomsPage: React.FC = () => {
                             </p>
                           </div>
                           <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                            {studentProfileData.engagement_summary || studentProfileData.ai_summary}
+                            {studentProfileData.engagement_summary}
                           </p>
                         </div>
                       )}

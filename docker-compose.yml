@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      MONGODB_URL: mongodb://mongodb:27017
+      MONGODB_URL: ${MONGODB_URL:-mongodb://mongodb:27017}
       MONGODB_DB: ${MONGODB_DB:-eduai_suite}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       AUTH_PROVIDER: supabase
@@ -60,7 +60,7 @@ services:
       - ./apps/teacherbuddy/.env
     restart: unless-stopped
     environment:
-      VITE_API_URL: https://eduai-suite-development.onrender.com
+      VITE_API_URL: ${VITE_API_URL:-https://eduai-suite-development.onrender.com}
     ports:
       - "5173:5173"
     depends_on:
@@ -75,7 +75,7 @@ services:
       - ./apps/edugames/.env
     restart: unless-stopped
     environment:
-      VITE_API_URL: https://eduai-suite-development.onrender.com
+      VITE_API_URL: ${VITE_API_URL:-https://eduai-suite-development.onrender.com}
     ports:
       - "5174:5174"
     depends_on:
