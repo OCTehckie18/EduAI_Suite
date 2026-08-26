@@ -1,55 +1,42 @@
-# Local Docker testing
+# Local testing
 
-This Compose setup is for local development before pushing changes. It keeps
-application data inside the local MongoDB container and uses Supabase only for
-authentication and profile synchronization.
+Local testing uses Uvicorn and Vite directly. Docker Compose is reserved for
+deployment or self-contained Docker environments.
 
 ## Data boundaries
 
 - Frontends: `http://localhost:5173` and `http://localhost:5174`
 - Backend: `http://localhost:8000`
-- MongoDB from the host: `mongodb://localhost:27017`
-- MongoDB from the backend container: `mongodb://mongodb:27017`
-- Local database: `eduai_suite_local`
-- Local Mongo volume: `mongodb_local_data`
+- Local MongoDB: `mongodb://localhost:27017`
 - Supabase: authentication/profile identity only
 
-The backend Compose environment intentionally fixes `MONGODB_URL` and
-`MONGODB_DB`, so a remote MongoDB URL in a developer `.env` file cannot be
-used by the Docker backend.
+Create `backend/.env.local` (ignored by Git) with:
 
-## Start local services
+```env
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_DB=eduai_suite_local
+```
 
-From the repository root, with Docker Desktop running:
+Then run the backend and frontends directly:
+
+```powershell
+cd backend
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+```powershell
+cd apps/teacherbuddy
+npm run dev
+```
+
+The frontend `.env` files already point to `http://localhost:8000`.
+
+## Compose deployment
+
+Compose defaults to the Render API URL and bundled MongoDB. Set deployment
+variables such as `MONGODB_URL`, `MONGODB_DB`, and `VITE_API_URL` in the
+deployment environment when using external services.
 
 ```powershell
 docker compose up -d --build
 ```
-
-Do not run Uvicorn or Vite separately on ports 8000, 5173, or 5174 while the
-Compose services are running.
-
-Check the services:
-
-```powershell
-docker compose ps
-docker compose logs -f backend
-```
-
-Open TeacherBuddy at `http://localhost:5173`. On the first login, Supabase
-authenticates the account and the local backend creates the corresponding
-profile in the local `eduai_suite_local` database.
-
-## Reset local application data
-
-This removes only the dedicated local MongoDB volume and cannot affect the
-remote MongoDB database:
-
-```powershell
-docker compose down
-docker volume rm eduai_suite_mongodb_local_data
-docker compose up -d --build
-```
-
-After a reset, log in again and recreate local courses, students, and other
-test data.

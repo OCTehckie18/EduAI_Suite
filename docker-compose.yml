@@ -5,8 +5,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      # Dedicated local-only MongoDB storage. This is never the Render/Atlas database.
-      - mongodb_local_data:/data/db
+      - mongodb_data:/data/db
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1"]
       interval: 10s
@@ -20,9 +19,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      # Keep this fixed: local Docker must never inherit the Atlas URL from .env.
-      MONGODB_URL: mongodb://mongodb:27017
-      MONGODB_DB: eduai_suite_local
+      MONGODB_URL: ${MONGODB_URL:-mongodb://mongodb:27017}
+      MONGODB_DB: ${MONGODB_DB:-eduai_suite}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       AUTH_PROVIDER: supabase
       STORAGE_PROVIDER: supabase
@@ -62,7 +60,7 @@ services:
       - ./apps/teacherbuddy/.env
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: ${VITE_API_URL:-https://eduai-suite-development.onrender.com}
     ports:
       - "5173:5173"
     depends_on:
@@ -77,7 +75,7 @@ services:
       - ./apps/edugames/.env
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: ${VITE_API_URL:-https://eduai-suite-development.onrender.com}
     ports:
       - "5174:5174"
     depends_on:
@@ -85,6 +83,6 @@ services:
         condition: service_healthy
 
 volumes:
-  mongodb_local_data:
+  mongodb_data:
   backend_uploads:
   backend_local_uploads:
