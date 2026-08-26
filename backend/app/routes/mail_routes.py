@@ -5,11 +5,13 @@ from app.models.course import Course
 from app.models.mail import MailDraft, MailHistory
 from app.models.history import ActionHistory
 from app.utils.email_utils import send_email
+from app.services.groq_service import GroqService, DEFAULT_MODEL
 from pydantic import BaseModel
 from typing import List, Optional, Any
 import pandas as pd
 import io
 import re
+import json
 
 mail_router = APIRouter(prefix="/mail", tags=["Mailing"])
 
@@ -47,6 +49,56 @@ class GmailLogRequest(BaseModel):
     body: str
     recipients: List[str]
     sender_email: Optional[str] = None
+
+class GenerateMailRequest(BaseModel):
+    conditions: List[Condition] = []
+    students: List[TemporaryStudent] = []
+
+@mail_router.post("/generate")
+async def generate_mail(req: GenerateMailRequest):
+    """Generate a reusable mail subject/body from the query result set."""
+    if not req.students:
+        raise HTTPException(status_code=400, detail="Run the query and select at least one student first")
+    if not GroqService._available or not GroqService._client:
+        raise HTTPException(status_code=503, detail="Groq is unavailable. Compose the message manually or try again later.")
+
+    student_context = [
+        {"name": s.name, "attendance": s.attendance, "avg_score": s.avg_score}
+        for s in req.students[:100]
+    ]
+    prompt = f"""You are a university teacher's communication assistant.
+Generate one professional email for the selected students from a query builder.
+Return ONLY valid JSON with exactly two keys: subject and body.
+
+QUERY CONDITIONS:
+{json.dumps([condition.model_dump() for condition in req.conditions])}
+
+SELECTED STUDENTS:
+{json.dumps(student_context)}
+
+Rules:
+- Do not invent facts or student-specific claims.
+- Use {{name}}, {{attendance}}, and {{marks}} placeholders when personalization is useful.
+- Keep the subject concise and the body clear, respectful, and ready to send.
+- Mention the pattern represented by the query conditions, not unrelated platform details.
+"""
+    try:
+        response = GroqService._client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=DEFAULT_MODEL,
+            temperature=0.4,
+            max_tokens=700,
+        )
+        raw = response.choices[0].message.content.strip()
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+        generated = json.loads(raw)
+        subject = str(generated.get("subject", "")).strip()
+        body = str(generated.get("body", "")).strip()
+        if not subject or not body:
+            raise ValueError("Groq returned an incomplete message")
+        return {"subject": subject, "body": body}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Mail generation failed: {exc}") from exc
 
 @mail_router.post("/preview_upload")
 async def preview_upload(file: UploadFile = File(...)):

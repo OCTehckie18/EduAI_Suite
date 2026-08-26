@@ -31,13 +31,6 @@ interface Student {
   registration_number: string;
   attendance: number;
   avg_score: number;
-  course_id: number;
-}
-
-interface Course {
-  id: number;
-  name: string;
-  code: string;
 }
 
 interface Condition {
@@ -69,7 +62,6 @@ const FIELDS = [
   { value: "avg_score", label: "Average Marks (%)", type: "number" },
   { value: "name", label: "Student Name", type: "text" },
   { value: "registration_number", label: "Register Number", type: "text" },
-  { value: "course_id", label: "Course", type: "select" },
 ];
 
 const OPERATORS = [
@@ -84,13 +76,13 @@ const OPERATORS = [
 
 export const MailStudentsPage: React.FC = () => {
   const authUser = useAuthStore((state) => state.user);
-  const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([
     { id: Math.random().toString(36).substr(2, 9), field: "attendance", operator: "<", value: 75 }
   ]);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [generatingMail, setGeneratingMail] = useState(false);
   
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [mailSubject, setMailSubject] = useState("");
@@ -120,7 +112,6 @@ export const MailStudentsPage: React.FC = () => {
   const [uploadedData, setUploadedData] = useState<Student[]>([]);
 
   useEffect(() => {
-    fetchCourses();
     fetchDrafts();
     fetchHistory();
   }, []);
@@ -132,16 +123,6 @@ export const MailStudentsPage: React.FC = () => {
   useEffect(() => {
     if (senderEmail) localStorage.setItem("teacher_sender_email", senderEmail);
   }, [senderEmail]);
-
-  const fetchCourses = async () => {
-    try {
-      const res = await fetch(`${API_ENDPOINTS.COURSES}/`);
-      const data = await res.json();
-      setCourses(data);
-    } catch (err) {
-      console.error("Failed to fetch courses", err);
-    }
-  };
 
   const fetchDrafts = async () => {
     try {
@@ -276,7 +257,7 @@ export const MailStudentsPage: React.FC = () => {
         const apiConditions = conditions.map(c => ({
           field: c.field,
           operator: c.operator,
-          value: c.field === 'course_id' || c.field === 'attendance' || c.field === 'avg_score' 
+          value: c.field === 'attendance' || c.field === 'avg_score'
             ? (typeof c.value === 'string' ? parseInt(c.value) : c.value)
             : c.value
         }));
@@ -366,6 +347,43 @@ export const MailStudentsPage: React.FC = () => {
     // Pre-select the current draft if we are viewing one
     if (selectedDraftId && !draftsToSend.includes(selectedDraftId)) {
         setDraftsToSend([selectedDraftId]);
+    }
+  };
+
+  const handleGenerateMail = async () => {
+    const sourceStudents = dataSource === 'upload' ? uploadedData : students;
+    const selected = sourceStudents.filter(student => selectedStudents.includes(student.id));
+    if (!selected.length) {
+      setStatus({ type: 'error', message: "Run the query and select at least one student first." });
+      return;
+    }
+    setGeneratingMail(true);
+    setStatus(null);
+    try {
+      const res = await fetch(`${API_ENDPOINTS.MAIL}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conditions,
+          students: selected.map(student => ({
+            id: student.id,
+            name: student.name,
+            email: student.email,
+            registration_number: student.registration_number,
+            attendance: student.attendance,
+            avg_score: student.avg_score,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Groq could not generate the mail");
+      setMailSubject(data.subject);
+      setMailBody(data.body);
+      setStatus({ type: 'success', message: "Groq generated the subject and message body. Review them before opening Gmail." });
+    } catch (err) {
+      setStatus({ type: 'error', message: err instanceof Error ? err.message : "Mail generation failed" });
+    } finally {
+      setGeneratingMail(false);
     }
   };
 
@@ -619,7 +637,7 @@ export const MailStudentsPage: React.FC = () => {
                         <select 
                           className="w-full text-xs font-semibold p-2 rounded-lg border bg-white outline-none focus:ring-2 focus:ring-blue-500/20"
                           value={cond.field}
-                          onChange={(e) => updateCondition(cond.id, { field: e.target.value, value: e.target.value === 'course_id' ? "" : (FIELDS.find(f => f.value === e.target.value)?.type === 'number' ? 0 : "") })}
+                        onChange={(e) => updateCondition(cond.id, { field: e.target.value, value: FIELDS.find(f => f.value === e.target.value)?.type === 'number' ? 0 : "" })}
                         >
                           {FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                         </select>
@@ -638,23 +656,12 @@ export const MailStudentsPage: React.FC = () => {
                         </div>
                         <div>
                           <label className="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Value</label>
-                          {cond.field === 'course_id' ? (
-                            <select 
-                              className="w-full text-xs font-semibold p-2 rounded-lg border bg-white outline-none focus:ring-2 focus:ring-blue-500/20"
-                              value={cond.value}
-                              onChange={(e) => updateCondition(cond.id, { value: e.target.value })}
-                            >
-                              <option value="">Select Course</option>
-                              {courses.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
-                            </select>
-                          ) : (
-                            <input 
+                          <input
                               type={FIELDS.find(f => f.value === cond.field)?.type || "text"}
                               className="w-full text-xs font-semibold p-2 rounded-lg border bg-white outline-none focus:ring-2 focus:ring-blue-500/20"
                               value={cond.value}
                               onChange={(e) => updateCondition(cond.id, { value: e.target.value })}
                             />
-                          )}
                         </div>
                       </div>
                     </div>
@@ -895,7 +902,12 @@ export const MailStudentsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-text-muted)" }}>Subject</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Subject</label>
+                  <button onClick={handleGenerateMail} disabled={generatingMail || selectedStudents.length === 0} className="text-xs font-bold text-blue-600 hover:text-blue-800 disabled:opacity-40">
+                    {generatingMail ? "Generating..." : "Generate with Groq"}
+                  </button>
+                </div>
                 <input 
                   type="text" 
                   placeholder="e.g., Attendance Warning / Appreciation Mail" 
