@@ -101,6 +101,7 @@ export const StudentClassrooms: React.FC = () => {
   const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<number[]>([]);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCode, setJoinCode] = useState("");
+  const [registrationNumber, setRegistrationNumber] = useState("");
   const [isJoining, setIsJoining] = useState(false);
 
   const selectedCourse = useMemo(
@@ -264,13 +265,46 @@ export const StudentClassrooms: React.FC = () => {
     setIsJoining(true);
     try {
       const user = get_user();
+      const storedRegistrationNumber = user.registration_number?.trim();
+      const enteredRegistrationNumber = registrationNumber.trim();
+
+      if (!storedRegistrationNumber && !enteredRegistrationNumber) {
+        throw new Error("Please enter your registration number before joining.");
+      }
+
+      let savedRegistrationNumber = storedRegistrationNumber || enteredRegistrationNumber;
+      if (!storedRegistrationNumber) {
+        const profileResponse = await fetch(`${API_URL}/auth/profile`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(localStorage.getItem("token")
+              ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+              : {}),
+          },
+          body: JSON.stringify({ registration_number: enteredRegistrationNumber }),
+        });
+
+        if (!profileResponse.ok) {
+          const errorData = await profileResponse.json().catch(() => ({}));
+          throw new Error(errorData.detail || "Could not save your registration number.");
+        }
+
+        const profileData = await profileResponse.json();
+        savedRegistrationNumber = profileData.registration_number || enteredRegistrationNumber;
+        localStorage.setItem(
+          "user",
+          JSON.stringify({ ...user, registration_number: savedRegistrationNumber }),
+        );
+      }
+
       const response = await fetch(`${API_URL}/students/enroll/code?enrollment_code=${joinCode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: user.name || "Student",
           email: user.sub || user.email || "student@university.edu",
-          registration_number: user.registration_number || `REG${Math.floor(Math.random() * 10000)}`,
+          registration_number: savedRegistrationNumber,
           student_class: user.student_class || "General",
           department: user.department || "General"
         })
@@ -304,6 +338,12 @@ export const StudentClassrooms: React.FC = () => {
       setShowJoinModal(true);
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (showJoinModal) {
+      setRegistrationNumber(get_user().registration_number || "");
+    }
+  }, [showJoinModal]);
 
   const filteredCourses = courses.filter(course =>
     `${course.code} ${course.name} ${course.batch} ${course.teacher_name || ""}`.toLowerCase().includes(search.toLowerCase()),
@@ -880,6 +920,24 @@ export const StudentClassrooms: React.FC = () => {
                   className="w-full text-center text-3xl font-black tracking-[0.2em] bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 outline-none transition-all placeholder:text-slate-300 uppercase"
                 />
               </div>
+
+              {!get_user().registration_number && (
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2" htmlFor="registration-number">
+                    Registration number
+                  </label>
+                  <input
+                    id="registration-number"
+                    type="text"
+                    value={registrationNumber}
+                    onChange={(e) => setRegistrationNumber(e.target.value)}
+                    placeholder="Enter your registration number"
+                    maxLength={50}
+                    required
+                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 py-3 focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/10 outline-none transition-all"
+                  />
+                </div>
+              )}
 
               <button 
                 type="submit" 

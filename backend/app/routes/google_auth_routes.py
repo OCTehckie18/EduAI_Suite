@@ -6,14 +6,16 @@ and returns a JWT with user status for the approval workflow.
 
 import os
 from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
 from app.models.user import User, UserStatus
 from app.schemas.user_schema import GoogleLoginRequest, GoogleToken
-from app.utils.auth import create_access_token
+from app.utils.auth import create_access_token, get_current_user
 from app.services.supabase_auth import supabase_auth_verifier
 from app.utils.role_detection import detect_role_from_email
 
@@ -21,6 +23,34 @@ google_auth_router = APIRouter(prefix="/auth", tags=["auth"])
 supabase_bearer = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
+
+class ProfileUpdateRequest(BaseModel):
+    registration_number: Optional[str] = None
+    department: Optional[str] = None
+
+
+@google_auth_router.patch("/profile")
+async def update_profile(
+    payload: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Update the authenticated user's optional profile details."""
+    if payload.registration_number is not None:
+        registration_number = payload.registration_number.strip()
+        if not registration_number:
+            raise HTTPException(status_code=422, detail="Registration number cannot be empty")
+        current_user.registration_number = registration_number[:50]
+
+    if payload.department is not None:
+        current_user.department = payload.department.strip()[:100] or None
+
+    await current_user.save()
+    return {
+        "message": "Profile updated",
+        "registration_number": current_user.registration_number,
+        "department": current_user.department,
+    }
 
 
 @google_auth_router.post("/google-login", response_model=GoogleToken)
