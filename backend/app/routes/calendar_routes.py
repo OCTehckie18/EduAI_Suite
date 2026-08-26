@@ -3,7 +3,8 @@ Calendar routes – aggregate assignments, exams, appointments, lessons,
 and custom teacher events into a unified calendar feed.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -45,6 +46,7 @@ class CalendarEventUpdate(BaseModel):
 
 
 calendar_router = APIRouter(prefix="/calendar", tags=["Calendar"])
+logger = logging.getLogger(__name__)
 
 
 def _same_identity(left: Optional[str], right: Optional[str]) -> bool:
@@ -55,6 +57,22 @@ def _same_identity(left: Optional[str], right: Optional[str]) -> bool:
 
 def _parse_date_safe(value: str) -> Optional[datetime]:
     """Try multiple date formats."""
+    if not value:
+        return None
+
+    normalized = value.strip()
+    # datetime.fromisoformat supports offsets but not a trailing Z on all
+    # supported Python versions. Convert UTC timestamps to naive UTC so they
+    # can be compared with the existing naive calendar range values.
+    iso_value = normalized[:-1] + "+00:00" if normalized.endswith("Z") else normalized
+    try:
+        parsed = datetime.fromisoformat(iso_value)
+        if parsed.tzinfo:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        pass
+
     formats = [
         "%Y-%m-%dT%H:%M:%S",
         "%Y-%m-%dT%H:%M:%S.%f",
@@ -98,6 +116,7 @@ async def get_calendar_events(
     range_end = _parse_date_safe(end) if end else datetime.utcnow() + timedelta(days=90)
 
     is_teacher = current_user.role == "teacher"
+    is_admin = current_user.role == "admin"
     # Identity and visibility are derived from the token, never from query params.
     scoped_email = current_user.email
     scoped_teacher_name = current_user.name
@@ -142,6 +161,14 @@ async def get_calendar_events(
     owned_course_ids = {
         c.int_id for c in courses if is_teacher and _same_identity(c.teacher_name, scoped_teacher_name)
     }
+    teacher_student_emails = set()
+    if is_teacher and owned_course_ids:
+        teacher_students = await Student.find(
+            Student.course_id.in_(owned_course_ids)
+        ).to_list()
+        teacher_student_emails = {
+            student.email for student in teacher_students if student.email
+        }
 
     assignments = await Assignment.find_all().to_list()
     for assg in assignments:
@@ -210,6 +237,12 @@ async def get_calendar_events(
             dt = _parse_date_safe(appt.requested_at) if appt.requested_at else None
             
         if not dt:
+            logger.debug(
+                "Skipping appointment %s: unable to parse time_slot=%r or requested_at=%r",
+                appt.int_id,
+                appt.time_slot,
+                appt.requested_at,
+            )
             continue
             
         if appt.status == "rejected":
@@ -220,8 +253,14 @@ async def get_calendar_events(
         if range_end and dt > range_end:
             continue
         if is_teacher and not _same_identity(appt.teacher_name, scoped_teacher_name):
-            continue
-        if not is_teacher and appt.student_email != scoped_email:
+            if appt.student_email not in teacher_student_emails:
+                logger.debug(
+                    "Skipping appointment %s for teacher %r: teacher identity and course enrollment did not match",
+                    appt.int_id,
+                    scoped_teacher_name,
+                )
+                continue
+        if not is_teacher and not is_admin and appt.student_email != scoped_email:
             continue
         status_colors = {"pending": "#d97706", "approved": "#16a34a", "rejected": "#dc2626"}
         events.append({
