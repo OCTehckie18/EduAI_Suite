@@ -68,10 +68,20 @@ async def create_appointment(
 ):
     if current_user.role == "teacher":
         raise HTTPException(status_code=403, detail="Only students can create appointment requests")
+
+    # Store the teacher's canonical profile name instead of relying on the
+    # display name supplied by the student-facing form.
+    teachers = await User.find(User.role == "teacher").to_list()
+    matched_teacher = next(
+        (teacher for teacher in teachers if _same_identity(teacher.name, payload.teacher_name)),
+        None,
+    )
+    canonical_teacher_name = matched_teacher.name if matched_teacher else payload.teacher_name
+
     appointment = Appointment(
         student_name=current_user.name or payload.student_name,
         student_email=current_user.email,
-        teacher_name=payload.teacher_name,
+        teacher_name=canonical_teacher_name,
         teacher_department=payload.teacher_department,
         meeting_mode=payload.meeting_mode,
         time_slot=payload.time_slot,
