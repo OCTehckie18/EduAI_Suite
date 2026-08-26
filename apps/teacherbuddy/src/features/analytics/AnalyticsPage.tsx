@@ -46,6 +46,8 @@ interface UploadedData {
     pass_rate?: string;
     high_score?: string;
     low_score?: string;
+    avg_attendance?: number;
+    attendance_column?: string;
     score_column?: string;
     scale?: number;
     missing_values?: number;
@@ -287,7 +289,7 @@ export const AnalyticsPage: React.FC = () => {
           { label: "Average Score", value: `${uploadedData?.summary?.avg_score}${uploadedData?.summary?.scale === 100 ? '%' : ''}`, color: "#264796", icon: <TrendingUp size={16}/> },
           { label: "Total Students", value: uploadedData?.summary?.rows || 0, color: "#16a34a", icon: <Users size={16}/> },
           { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
-          { label: "Attendance", value: "Not in upload", color: "#64748b", icon: <Activity size={16}/> },
+          { label: "Average Attendance", value: uploadedData?.summary?.avg_attendance != null ? `${uploadedData.summary.avg_attendance}%` : "Not in upload", color: "#d97706", icon: <Activity size={16}/> },
         ];
 
     return (
@@ -505,7 +507,7 @@ export const AnalyticsPage: React.FC = () => {
               </div>
               {!s.missing_data && (
                 <div className="flex gap-4">
-                   <RiskCell value={100 - (s.attendance || 80)} label="Absent" />
+                   <RiskCell value={100 - (s.attendance ?? 80)} label="Absent" />
                    <RiskCell value={100 - s.avgScore} label="Marks" />
                 </div>
               )}
@@ -531,7 +533,7 @@ export const AnalyticsPage: React.FC = () => {
                       </div>
                       <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
                         <p className="text-xs text-slate-500 mb-1">Attendance</p>
-                        <p className="text-lg font-bold text-slate-800">{s.attendance || 85}%</p>
+                        <p className="text-lg font-bold text-slate-800">{s.attendance ?? 85}%</p>
                       </div>
                       <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
                         <p className="text-xs text-slate-500 mb-1">Risk Factor</p>

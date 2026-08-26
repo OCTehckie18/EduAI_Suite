@@ -270,6 +270,9 @@ async def upload_analytics_data(
     
     if not score_col and valid_numeric_cols:
         score_col = valid_numeric_cols[0]
+
+    attendance_col = next((column for column in df.columns if column in {"attendance", "attendance_rate", "attendance_percentage"} or "attendance" in column), None)
+    avg_attendance = float(df[attendance_col].mean(skipna=True)) if attendance_col and df[attendance_col].notna().any() else None
     
     if score_col:
         max_val = df[score_col].max(skipna=True)
@@ -322,6 +325,7 @@ async def upload_analytics_data(
                 "id": str(row.get(roll_col, 'N/A')),
                 "name": str(row.get(name_col, 'Unknown')),
                 "avgScore": float(score_val),
+                "attendance": float(row[attendance_col]) if attendance_col and pd.notna(row.get(attendance_col)) else None,
                 "risk": int(100 - (score_val/scale)*100),
                 "level": "high" if (score_val/scale)*100 < 40 else "moderate"
             })
@@ -334,6 +338,7 @@ async def upload_analytics_data(
                     "id": str(row.get(roll_col, 'N/A')),
                     "name": str(row.get(name_col, 'Unknown')),
                     "avgScore": 0,
+                    "attendance": float(row[attendance_col]) if attendance_col and pd.notna(row.get(attendance_col)) else None,
                     "risk": 100,
                     "level": "high",
                     "missing_data": True
@@ -368,6 +373,8 @@ async def upload_analytics_data(
             "pass_rate": f"{pass_rate:.0f}%",
             "high_score": high_score,
             "low_score": low_score,
+            "attendance_column": attendance_col,
+            "avg_attendance": round(avg_attendance, 1) if avg_attendance is not None else None,
             "missing_values": missing_after,
             "impute_method": impute_method
         },
