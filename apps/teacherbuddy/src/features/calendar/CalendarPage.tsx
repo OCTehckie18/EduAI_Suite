@@ -23,6 +23,7 @@ import { GlassCard } from "../../shared/components/GlassCard";
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
 
 const API_URL = API_ENDPOINTS.BASE;
+const GOOGLE_CALENDAR_UI_ENABLED = false;
 
 type CalendarEvent = {
   id: string;
@@ -421,10 +422,12 @@ export const CalendarPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button onClick={syncGoogleCalendar} className="btn btn-outline" disabled={googleSyncing}>
-            {googleSyncing ? <RefreshCw size={16} className="animate-spin" /> : <Cloud size={16} />}
-            {googleConnected ? "Sync Google Calendar" : "Connect Google Calendar"}
-          </button>
+          {GOOGLE_CALENDAR_UI_ENABLED && (
+            <button onClick={syncGoogleCalendar} className="btn btn-outline" disabled={googleSyncing}>
+              {googleSyncing ? <RefreshCw size={16} className="animate-spin" /> : <Cloud size={16} />}
+              {googleConnected ? "Sync Google Calendar" : "Connect Google Calendar"}
+            </button>
+          )}
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-text-muted)" }} />
             <input
