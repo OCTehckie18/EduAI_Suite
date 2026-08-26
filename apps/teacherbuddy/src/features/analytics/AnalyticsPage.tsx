@@ -538,10 +538,6 @@ export const AnalyticsPage: React.FC = () => {
                         <p className={`text-lg font-bold ${s.level === 'high' ? 'text-red-600' : 'text-orange-600'}`}>{s.risk}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button className="btn btn-primary text-xs flex-1 py-2">Create Intervention Plan</button>
-                      <button className="btn btn-outline text-xs flex-1 py-2">Notify Parents</button>
-                    </div>
                   </>
                 )}
               </div>
