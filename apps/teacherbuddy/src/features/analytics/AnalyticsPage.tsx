@@ -3,8 +3,7 @@ import {
   BarChart3, TrendingUp, AlertTriangle, Users, Download,
   ChevronDown, Filter, RefreshCw, Activity, ArrowUp, ArrowDown,
   BrainCircuit, Eye, Info, Upload, FileSpreadsheet, Check, X,
-  PieChart as PieChartIcon, LayoutDashboard, Database,
-  CheckCircle2, Award, Target
+  PieChart as PieChartIcon, LayoutDashboard, Database
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { 
@@ -14,6 +13,7 @@ import {
 } from 'recharts';
 
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const API_BASE = API_ENDPOINTS.BASE;
 
@@ -46,6 +46,8 @@ interface UploadedData {
     pass_rate?: string;
     high_score?: string;
     low_score?: string;
+    avg_attendance?: number;
+    attendance_column?: string;
     score_column?: string;
     scale?: number;
     missing_values?: number;
@@ -78,6 +80,7 @@ const RiskCell: React.FC<{ value: number; label: string }> = ({ value, label }) 
 };
 
 export const AnalyticsPage: React.FC = () => {
+  const authUser = useAuthStore((state) => state.user);
   // 1. Determine if this is a reload and get persisted state immediately
   const persisted = useMemo(() => {
     const navEntries = performance.getEntriesByType("navigation");
@@ -151,7 +154,7 @@ export const AnalyticsPage: React.FC = () => {
 
   // Fetch analytics when course changes
   useEffect(() => {
-    if (selectedCourseId && dataSource === "platform") {
+    if (activeTab !== "risk" && selectedCourseId && dataSource === "platform") {
       // Prevent redundant fetch if we already have the data for this course from session
       if (analytics && selectedCourseId === lastFetchedCourseId.current) {
         return;
@@ -170,7 +173,29 @@ export const AnalyticsPage: React.FC = () => {
           setLoading(false);
         });
     }
-  }, [selectedCourseId, dataSource]);
+  }, [selectedCourseId, dataSource, activeTab]);
+
+  // Risk intelligence is intentionally global: course selection must not scope this tab.
+  useEffect(() => {
+    if (activeTab !== "risk" || dataSource !== "platform") return;
+    const teacherName = authUser?.name || authUser?.email;
+    if (!teacherName) return;
+    setLoading(true);
+    fetch(`${API_BASE}/analytics/risk-global?teacher_name=${encodeURIComponent(teacherName)}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch global risk intelligence");
+        return res.json();
+      })
+      .then(data => {
+        setAnalytics(data);
+        lastFetchedCourseId.current = null;
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching global risk intelligence:", err);
+        setLoading(false);
+      });
+  }, [activeTab, dataSource, authUser?.name, authUser?.email]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -255,20 +280,16 @@ export const AnalyticsPage: React.FC = () => {
 
     const stats = dataSource === "platform" 
       ? [
-          { label: "Class Average", value: analytics?.overview?.avg_score || "0%", color: "#264796", icon: <TrendingUp size={16}/> },
+          { label: "Average Score", value: analytics?.overview?.avg_score || "0%", color: "#264796", icon: <TrendingUp size={16}/> },
           { label: "Total Students", value: analytics?.overview?.total_students || 0, color: "#16a34a", icon: <Users size={16}/> },
           { label: "At-Risk Count", value: analytics?.overview?.at_risk_count || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
-          { label: "Pass Rate", value: (analytics?.overview as any)?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
-          { label: "High Score", value: (analytics?.overview as any)?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
-          { label: "Low Score", value: (analytics?.overview as any)?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
+          { label: "Average Attendance", value: analytics?.overview?.attendance_rate || "0%", color: "#d97706", icon: <Activity size={16}/> },
         ]
       : [
-          { label: "Class Average", value: `${uploadedData?.summary?.avg_score}${uploadedData?.summary?.scale === 100 ? '%' : ''}`, color: "#264796", icon: <TrendingUp size={16}/> },
+          { label: "Average Score", value: `${uploadedData?.summary?.avg_score}${uploadedData?.summary?.scale === 100 ? '%' : ''}`, color: "#264796", icon: <TrendingUp size={16}/> },
           { label: "Total Students", value: uploadedData?.summary?.rows || 0, color: "#16a34a", icon: <Users size={16}/> },
           { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
-          { label: "Pass Rate", value: uploadedData?.summary?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
-          { label: "High Score", value: uploadedData?.summary?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
-          { label: "Low Score", value: uploadedData?.summary?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
+          { label: "Average Attendance", value: uploadedData?.summary?.avg_attendance != null ? `${uploadedData.summary.avg_attendance}%` : "Not in upload", color: "#d97706", icon: <Activity size={16}/> },
         ];
 
     return (
@@ -486,7 +507,7 @@ export const AnalyticsPage: React.FC = () => {
               </div>
               {!s.missing_data && (
                 <div className="flex gap-4">
-                   <RiskCell value={100 - (s.attendance || 80)} label="Absent" />
+                   <RiskCell value={100 - (s.attendance ?? 80)} label="Absent" />
                    <RiskCell value={100 - s.avgScore} label="Marks" />
                 </div>
               )}
@@ -512,16 +533,12 @@ export const AnalyticsPage: React.FC = () => {
                       </div>
                       <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
                         <p className="text-xs text-slate-500 mb-1">Attendance</p>
-                        <p className="text-lg font-bold text-slate-800">{s.attendance || 85}%</p>
+                        <p className="text-lg font-bold text-slate-800">{s.attendance ?? 85}%</p>
                       </div>
                       <div className="p-3 bg-white rounded-lg border border-slate-100 text-center">
                         <p className="text-xs text-slate-500 mb-1">Risk Factor</p>
                         <p className={`text-lg font-bold ${s.level === 'high' ? 'text-red-600' : 'text-orange-600'}`}>{s.risk}</p>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="btn btn-primary text-xs flex-1 py-2">Create Intervention Plan</button>
-                      <button className="btn btn-outline text-xs flex-1 py-2">Notify Parents</button>
                     </div>
                   </>
                 )}
@@ -593,7 +610,11 @@ export const AnalyticsPage: React.FC = () => {
       {/* Control Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-y border-slate-100">
         <div className="flex items-center gap-3">
-          {dataSource === "platform" ? (
+          {dataSource === "platform" && activeTab === "risk" ? (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-700 text-sm font-bold">
+              <AlertTriangle size={16} /> All Courses
+            </div>
+          ) : dataSource === "platform" ? (
             <>
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Selected Course:</span>
               <div className="relative">
@@ -625,7 +646,15 @@ export const AnalyticsPage: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button onClick={() => {
-            if (dataSource === "platform" && selectedCourseId) {
+            if (dataSource === "platform" && activeTab === "risk") {
+              const teacherName = authUser?.name || authUser?.email;
+              if (!teacherName) return;
+              setLoading(true);
+              fetch(`${API_BASE}/analytics/risk-global?teacher_name=${encodeURIComponent(teacherName)}`)
+                .then(res => res.json())
+                .then(data => { setAnalytics(data); lastFetchedCourseId.current = null; setLoading(false); })
+                .catch(() => setLoading(false));
+            } else if (dataSource === "platform" && selectedCourseId) {
               setLoading(true);
               fetch(`${API_BASE}/analytics/course/${selectedCourseId}`)
                 .then(res => res.json())

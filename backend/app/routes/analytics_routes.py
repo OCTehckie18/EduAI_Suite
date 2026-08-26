@@ -4,6 +4,7 @@ from app.models.submission import Submission
 from app.models.assignment import Assignment
 from app.models.student import Student
 from app.models.user import User
+from app.models.course import Course
 from typing import List, Optional
 import pandas as pd
 import io
@@ -12,6 +13,51 @@ from datetime import datetime
 import json
 
 analytics_router = APIRouter(prefix="/analytics", tags=["Analytics"])
+
+
+@analytics_router.get("/risk-global")
+async def get_global_risk(teacher_name: str = ""):
+    """Return risk intelligence for every course owned by a teacher."""
+    if not teacher_name.strip():
+        raise HTTPException(status_code=400, detail="teacher_name is required")
+
+    courses = await Course.find(Course.teacher_name == teacher_name).to_list()
+    course_ids = [course.int_id for course in courses]
+    students = await Student.find({"course_id": {"$in": course_ids}}).to_list() if course_ids else []
+
+    avg_attendance = sum(float(student.attendance or 0) for student in students) / len(students) if students else 0
+    avg_score = sum(float(student.avg_score or 0) for student in students) / len(students) if students else 0
+    risk_students = []
+    for student in students:
+        attendance = float(student.attendance or 0)
+        score = float(student.avg_score or 0)
+        is_risk = score < 40 or attendance < 50 or score < 55 or attendance < 75
+        if is_risk:
+            risk_students.append({
+                "id": student.registration_number or f"ST-{student.int_id}",
+                "name": student.name or "Unknown Student",
+                "course_id": student.course_id,
+                "attendance": attendance,
+                "avgScore": score,
+                "assignments": 0,
+                "risk": round(100 - (score + attendance) / 2),
+                "level": "high" if score < 40 or attendance < 50 else "moderate",
+            })
+
+    risk_students.sort(key=lambda student: student["risk"], reverse=True)
+    return {
+        "overview": {
+            "avg_score": f"{avg_score:.1f}%",
+            "total_students": len(students),
+            "at_risk_count": len(risk_students),
+            "attendance_rate": f"{avg_attendance:.1f}%",
+        },
+        "avg_score": avg_score,
+        "avg_attendance": avg_attendance,
+        "at_risk_count": len(risk_students),
+        "risk_students": risk_students,
+        "course_count": len(courses),
+    }
 
 @analytics_router.get("/course/{course_id}")
 async def get_course_analytics(course_id: int):
@@ -224,6 +270,9 @@ async def upload_analytics_data(
     
     if not score_col and valid_numeric_cols:
         score_col = valid_numeric_cols[0]
+
+    attendance_col = next((column for column in df.columns if column in {"attendance", "attendance_rate", "attendance_percentage"} or "attendance" in column), None)
+    avg_attendance = float(df[attendance_col].mean(skipna=True)) if attendance_col and df[attendance_col].notna().any() else None
     
     if score_col:
         max_val = df[score_col].max(skipna=True)
@@ -276,6 +325,7 @@ async def upload_analytics_data(
                 "id": str(row.get(roll_col, 'N/A')),
                 "name": str(row.get(name_col, 'Unknown')),
                 "avgScore": float(score_val),
+                "attendance": float(row[attendance_col]) if attendance_col and pd.notna(row.get(attendance_col)) else None,
                 "risk": int(100 - (score_val/scale)*100),
                 "level": "high" if (score_val/scale)*100 < 40 else "moderate"
             })
@@ -288,6 +338,7 @@ async def upload_analytics_data(
                     "id": str(row.get(roll_col, 'N/A')),
                     "name": str(row.get(name_col, 'Unknown')),
                     "avgScore": 0,
+                    "attendance": float(row[attendance_col]) if attendance_col and pd.notna(row.get(attendance_col)) else None,
                     "risk": 100,
                     "level": "high",
                     "missing_data": True
@@ -322,6 +373,8 @@ async def upload_analytics_data(
             "pass_rate": f"{pass_rate:.0f}%",
             "high_score": high_score,
             "low_score": low_score,
+            "attendance_column": attendance_col,
+            "avg_attendance": round(avg_attendance, 1) if avg_attendance is not None else None,
             "missing_values": missing_after,
             "impute_method": impute_method
         },
