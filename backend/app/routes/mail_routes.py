@@ -42,6 +42,12 @@ class SendMailRequest(BaseModel):
     body: Optional[str] = None
     draft_ids: Optional[List[int]] = None
 
+class GmailLogRequest(BaseModel):
+    subject: str
+    body: str
+    recipients: List[str]
+    sender_email: Optional[str] = None
+
 @mail_router.post("/preview_upload")
 async def preview_upload(file: UploadFile = File(...)):
     content = await file.read()
@@ -234,6 +240,34 @@ async def delete_draft(draft_id: int):
 @mail_router.get("/history")
 async def get_history():
     return await MailHistory.find_all().sort("-sent_at").to_list()
+
+@mail_router.post("/log-gmail-send")
+async def log_gmail_send(req: GmailLogRequest):
+    """Record a Gmail compose action without sending through the backend."""
+    recipients = [email.strip() for email in req.recipients if email and email.strip()]
+    if not recipients:
+        raise HTTPException(status_code=400, detail="At least one recipient is required")
+
+    history = MailHistory(
+        subject=req.subject,
+        body=req.body,
+        recipients=[{"email": email} for email in recipients],
+        recipient_count=len(recipients),
+    )
+    await history.assign_id()
+    await history.insert()
+
+    action_history = ActionHistory(
+        feature="mail",
+        action="open_gmail_compose",
+        reaction="user_triggered",
+        result=f"opened_{len(recipients)}_recipients",
+        timestamp=datetime.now(),
+        metadata_json={"subject": req.subject, "sender_email": req.sender_email, "recipient_count": len(recipients)},
+    )
+    await action_history.assign_id()
+    await action_history.insert()
+    return {"message": f"Logged Gmail compose for {len(recipients)} recipients"}
 
 @mail_router.post("/send")
 async def send_bulk_mail(req: SendMailRequest, background_tasks: BackgroundTasks):

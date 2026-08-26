@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { API_ENDPOINTS } from "../../shared/utils/apiConfig";
+import { useAuthStore } from "../../store/useAuthStore";
 
 const API_BASE_URL = API_ENDPOINTS.BASE;
 
@@ -82,6 +83,7 @@ const OPERATORS = [
 ];
 
 export const MailStudentsPage: React.FC = () => {
+  const authUser = useAuthStore((state) => state.user);
   const [courses, setCourses] = useState<Course[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([
@@ -93,6 +95,9 @@ export const MailStudentsPage: React.FC = () => {
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [mailSubject, setMailSubject] = useState("");
   const [mailBody, setMailBody] = useState("");
+  const [senderEmail, setSenderEmail] = useState(() => localStorage.getItem("teacher_sender_email") || "");
+  const [sendMode, setSendMode] = useState<"gmail" | "smtp">("gmail");
+  const [gmailProgress, setGmailProgress] = useState<{ current: number; total: number } | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
@@ -119,6 +124,14 @@ export const MailStudentsPage: React.FC = () => {
     fetchDrafts();
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+    if (!senderEmail && authUser?.email) setSenderEmail(authUser.email);
+  }, [authUser?.email, senderEmail]);
+
+  useEffect(() => {
+    if (senderEmail) localStorage.setItem("teacher_sender_email", senderEmail);
+  }, [senderEmail]);
 
   const fetchCourses = async () => {
     try {
@@ -356,10 +369,71 @@ export const MailStudentsPage: React.FC = () => {
     }
   };
 
+  const openGmailComposes = async () => {
+    if (!senderEmail.trim()) {
+      setStatus({ type: 'error', message: "Enter your sender email address first." });
+      return;
+    }
+    const sourceStudents = dataSource === 'upload' ? uploadedData : students;
+    const recipients = sourceStudents
+      .filter(student => selectedStudents.includes(student.id) && student.email?.trim())
+      .map(student => student.email.trim());
+    if (!recipients.length) {
+      setStatus({ type: 'error', message: "Selected students do not have email addresses." });
+      return;
+    }
+
+    const mailItems = draftsToSend.length > 0
+      ? drafts.filter(draft => draftsToSend.includes(draft.id)).map(draft => ({ subject: draft.subject || "", body: draft.body || "" }))
+      : [{ subject: mailSubject, body: mailBody }];
+    if (mailItems.some(item => !item.subject || !item.body)) {
+      setStatus({ type: 'error', message: "Subject and body are required to open Gmail." });
+      return;
+    }
+
+    const batches: Array<{ subject: string; body: string; recipients: string[] }> = [];
+    for (const item of mailItems) {
+      let current: string[] = [];
+      for (const recipient of recipients) {
+        const candidate = [...current, recipient];
+        const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(candidate.join(","))}&su=${encodeURIComponent(item.subject)}&body=${encodeURIComponent(item.body)}`;
+        if (current.length && url.length > 1800) {
+          batches.push({ ...item, recipients: current });
+          current = [recipient];
+        } else {
+          current = candidate;
+        }
+      }
+      if (current.length) batches.push({ ...item, recipients: current });
+    }
+
+    setGmailProgress({ current: 0, total: batches.length });
+    for (let index = 0; index < batches.length; index += 1) {
+      const batch = batches[index];
+      const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(batch.recipients.join(","))}&su=${encodeURIComponent(batch.subject)}&body=${encodeURIComponent(batch.body)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      await fetch(`${API_ENDPOINTS.MAIL}/log-gmail-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: batch.subject, body: batch.body, recipients: batch.recipients, sender_email: senderEmail }),
+      });
+      setGmailProgress({ current: index + 1, total: batches.length });
+      if (index < batches.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
+    }
+    setStatus({ type: 'success', message: `Opened ${batches.length} Gmail compose window${batches.length === 1 ? "" : "s"}.` });
+    fetchHistory();
+    setGmailProgress(null);
+    setDraftsToSend([]);
+  };
+
   const executeSendMails = async () => {
     setShowDraftSelectionPopup(false);
     setSending(true);
     try {
+      if (sendMode === "gmail") {
+        await openGmailComposes();
+        return;
+      }
       const payload: any = {};
       
       if (dataSource === 'upload') {
@@ -797,6 +871,30 @@ export const MailStudentsPage: React.FC = () => {
 
             <div className="space-y-4">
               <div>
+                <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-text-muted)" }}>Sender Email</label>
+                <input
+                  type="email"
+                  placeholder={authUser?.email || "teacher@christuniversity.in"}
+                  className="w-full p-3 rounded-xl border bg-transparent focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                  value={senderEmail}
+                  onChange={e => setSenderEmail(e.target.value)}
+                />
+                <p className="text-[10px] mt-1" style={{ color: "var(--color-text-muted)" }}>Saved locally and used for Gmail action history.</p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "var(--color-border)" }}>
+                <div>
+                  <p className="text-xs font-bold" style={{ color: "var(--color-text-primary)" }}>Delivery method</p>
+                  <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Gmail opens a compose window; SMTP sends through the backend.</p>
+                </div>
+                <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+                  <button onClick={() => setSendMode("gmail")} className={`px-3 py-1.5 rounded-md text-[10px] font-bold ${sendMode === "gmail" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"}`}>Gmail (Recommended)</button>
+                  <button onClick={() => setSendMode("smtp")} className={`px-3 py-1.5 rounded-md text-[10px] font-bold ${sendMode === "smtp" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"}`}>SMTP Fallback</button>
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-text-muted)" }}>Subject</label>
                 <input 
                   type="text" 
@@ -870,7 +968,7 @@ export const MailStudentsPage: React.FC = () => {
                 disabled={sending || selectedStudents.length === 0}
                 className="flex items-center gap-2 px-8 py-3 bg-brand-blue text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
               >
-                {sending ? "Sending..." : <><Send size={18} /> Send Mails</>}
+                {sending ? "Sending..." : sendMode === "gmail" ? <><Mail size={18} /> Open in Gmail</> : <><Send size={18} /> Send via SMTP</>}
               </button>
             </div>
           </div>
@@ -965,6 +1063,16 @@ export const MailStudentsPage: React.FC = () => {
         </div>
       )}
 
+      {gmailProgress && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl text-center">
+            <Mail size={28} className="mx-auto mb-3 text-blue-600" />
+            <p className="font-bold text-gray-800">Opening Gmail</p>
+            <p className="text-sm text-gray-500 mt-1">Opening batch {gmailProgress.current + 1} of {gmailProgress.total}...</p>
+          </div>
+        </div>
+      )}
+
       {showDraftSelectionPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl animate-fade-in border border-gray-100">
@@ -1007,7 +1115,7 @@ export const MailStudentsPage: React.FC = () => {
              <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
                 <button className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors" onClick={() => setShowDraftSelectionPopup(false)}>Cancel</button>
                 <button className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold bg-brand-blue text-white rounded-xl shadow-lg shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all" onClick={executeSendMails}>
-                    <Send size={16} /> Confirm Send
+                    {sendMode === "gmail" ? <Mail size={16} /> : <Send size={16} />} {sendMode === "gmail" ? "Open Gmail" : "Confirm Send"}
                 </button>
              </div>
           </div>
