@@ -13,7 +13,9 @@ from app.models.calendar import CalendarEvent
 from app.models.user import User
 
 
-CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar"
+# The app only reads and edits events. This narrower scope avoids requesting
+# permission to share or delete entire calendars.
+CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events"
 GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
 
 
