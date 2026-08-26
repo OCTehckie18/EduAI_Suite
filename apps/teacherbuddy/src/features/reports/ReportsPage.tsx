@@ -25,6 +25,12 @@ export const ReportsPage: React.FC = () => {
   const [templateTargetId, setTemplateTargetId] = useState<number | undefined>(undefined);
   const [templateError, setTemplateError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [manualStep, setManualStep] = useState<'upload' | 'review' | 'generated'>('upload');
+  const [detectedFields, setDetectedFields] = useState<string[]>([]);
+  const [requiredFields, setRequiredFields] = useState<string[]>([]);
+  const [fieldOverrides, setFieldOverrides] = useState<Record<string, string>>({});
+  const [meetingNotes, setMeetingNotes] = useState("");
+  const [manualResult, setManualResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchReports = async () => {
@@ -86,7 +92,7 @@ export const ReportsPage: React.FC = () => {
 
   const handleDownload = async (rep: any) => {
     // If it's a template report with DOCX, download via the API
-    if (rep.type === 'Template Report') {
+    if (rep.type === 'Template Report' || rep.type === 'Manual Report' || rep.type === 'Event Report') {
       try {
         const res = await fetch(`${API_ENDPOINTS.REPORTS}/${rep.id}/download`);
         if (res.ok) {
@@ -166,11 +172,12 @@ export const ReportsPage: React.FC = () => {
   // --- Template upload handlers ---
   const handleTemplateFileChange = (file: File | null) => {
     setTemplateError("");
-    if (file && !file.name.toLowerCase().endsWith('.pdf')) {
-      setTemplateError('Only PDF files are accepted as templates.');
+    if (file && !file.name.toLowerCase().endsWith('.docx')) {
+      setTemplateError('Upload the editable DOCX template so its formatting can be preserved exactly.');
       return;
     }
     setTemplateFile(file);
+    setManualStep('upload');
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -180,9 +187,9 @@ export const ReportsPage: React.FC = () => {
     if (file) handleTemplateFileChange(file);
   };
 
-  const handleTemplateGenerate = async () => {
+  const handleTemplateScan = async () => {
     if (!templateFile) {
-      setTemplateError('Please upload a PDF template first.');
+      setTemplateError('Please upload the editable DOCX template first.');
       return;
     }
     try {
@@ -190,18 +197,18 @@ export const ReportsPage: React.FC = () => {
       setTemplateError("");
       const formData = new FormData();
       formData.append('template_file', templateFile);
-      if (templateTargetId) {
-        formData.append('target_id', String(templateTargetId));
-      }
-      const res = await fetch(`${API_ENDPOINTS.REPORTS}/generate-from-template`, {
+      formData.append('meeting_notes', meetingNotes);
+      if (templateTargetId) formData.append('target_id', String(templateTargetId));
+      const res = await fetch(`${API_ENDPOINTS.REPORTS}/scan-template`, {
         method: 'POST',
         body: formData,
       });
       if (res.ok) {
-        setIsTemplateModalOpen(false);
-        setTemplateFile(null);
-        setTemplateTargetId(undefined);
-        fetchReports();
+        const data = await res.json();
+        setDetectedFields(data.fields_detected || []);
+        setFieldOverrides(data.preview_mapping || {});
+        setRequiredFields(data.fields_requiring_teacher || []);
+        setManualStep('review');
       } else {
         const data = await res.json();
         setTemplateError(data.detail || 'Failed to generate report.');
@@ -212,6 +219,77 @@ export const ReportsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTemplateGenerate = async () => {
+    if (!templateFile) return;
+    try {
+      setLoading(true);
+      setTemplateError("");
+      const formData = new FormData();
+      formData.append('template_file', templateFile);
+      formData.append('meeting_notes', meetingNotes);
+      formData.append('field_overrides', JSON.stringify(fieldOverrides));
+      if (templateTargetId) formData.append('target_id', String(templateTargetId));
+      const res = await fetch(`${API_ENDPOINTS.REPORTS}/generate-manual`, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const data = await res.json();
+        setTemplateError(data.detail || 'Failed to generate manual report.');
+        return;
+      }
+      const data = await res.json();
+      setManualResult(data);
+      setRequiredFields(data.fields_requiring_teacher || []);
+      setManualStep('generated');
+      fetchReports();
+    } catch (err) {
+      console.error(err);
+      setTemplateError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEventReportGenerate = async () => {
+    if (!meetingNotes.trim()) {
+      setTemplateError('Add the meeting or event notes before generating the report.');
+      return;
+    }
+    try {
+      setLoading(true);
+      setTemplateError("");
+      const formData = new FormData();
+      formData.append('meeting_notes', meetingNotes);
+      if (templateTargetId) formData.append('target_id', String(templateTargetId));
+      const res = await fetch(`${API_ENDPOINTS.REPORTS}/generate-event`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setTemplateError(data.detail || 'Failed to generate event report.');
+        return;
+      }
+      setRequiredFields(data.fields_requiring_teacher || []);
+      setManualResult(data);
+      setManualStep('generated');
+      fetchReports();
+    } catch (err) {
+      console.error(err);
+      setTemplateError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetTemplateModal = () => {
+    setIsTemplateModalOpen(false);
+    setTemplateFile(null);
+    setTemplateTargetId(undefined);
+    setDetectedFields([]);
+    setFieldOverrides({});
+    setRequiredFields([]);
+    setMeetingNotes("");
+    setManualResult(null);
+    setManualStep('upload');
+    setTemplateError("");
   };
 
   return (
@@ -252,18 +330,18 @@ export const ReportsPage: React.FC = () => {
         ))}
 
         {/* Template Upload Card */}
-        <GlassCard className="hidden p-6 group hover:scale-[1.02] transition-all duration-300 relative overflow-hidden">
+        <GlassCard className="p-6 group hover:scale-[1.02] transition-all duration-300 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-purple-500/10 to-transparent rounded-bl-full" />
           <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white">
             <Upload size={20} />
           </div>
-          <h3 className="text-lg font-bold mb-2 font-display" style={{ color: "var(--color-text-primary)" }}>Generate from Template</h3>
-          <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>Upload your PDF report format. AI fills in data &amp; generates DOCX.</p>
+          <h3 className="text-lg font-bold mb-2 font-display" style={{ color: "var(--color-text-primary)" }}>Event Reports</h3>
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>Turn meeting or event notes into the university activity report.</p>
           <button
-            onClick={() => { setIsTemplateModalOpen(true); setTemplateError(""); setTemplateFile(null); }}
+            onClick={() => { setIsTemplateModalOpen(true); setTemplateError(""); setTemplateFile(null); setManualStep('upload'); setMeetingNotes(''); setManualResult(null); }}
             className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-all duration-300 text-purple-400 hover:text-purple-300"
           >
-            Upload Template
+            Create Event Report
             <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
           </button>
         </GlassCard>
@@ -296,7 +374,7 @@ export const ReportsPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       {rep.status === 'generating' && <RefreshCw size={14} className="animate-spin text-[#264796]" />}
                       {rep.status === 'failed' && <span className="text-red-500 text-xs px-1 border border-red-500 rounded">Failed</span>}
-                      {rep.type === 'Template Report' && <span className="text-purple-400 text-[10px] px-1.5 py-0.5 border border-purple-400/40 rounded-md bg-purple-400/5 font-bold uppercase tracking-wider">Template</span>}
+                      {(rep.type === 'Template Report' || rep.type === 'Manual Report' || rep.type === 'Event Report') && <span className="text-purple-400 text-[10px] px-1.5 py-0.5 border border-purple-400/40 rounded-md bg-purple-400/5 font-bold uppercase tracking-wider">Event</span>}
                       {rep.name}
                     </div>
                   </td>
@@ -537,8 +615,48 @@ export const ReportsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Template Upload Modal */}
+      {/* Event Report Modal: uses the fixed docs/report template.docx on the backend */}
       {isTemplateModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121212] rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <div className="px-8 pt-8 pb-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white font-display">Event Reports</h2>
+                  <p className="text-gray-400 text-sm mt-1">Create the CHRIST activity report from meeting or event notes.</p>
+                </div>
+                <button onClick={resetTemplateModal} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 text-gray-400 hover:text-white"><X size={20} /></button>
+              </div>
+
+              {manualStep !== 'generated' && <>
+                <textarea value={meetingNotes} onChange={(e) => setMeetingNotes(e.target.value)} rows={12} placeholder="Paste the meeting/event notes here. Include the activity type, title, date, time, venue, guests, participants, highlights, takeaways, feedback, and follow-up details when available." className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2">Optional student/course context</label>
+                  <select value={templateTargetId ?? ''} onChange={(e) => setTemplateTargetId(e.target.value ? Number(e.target.value) : undefined)} className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-white">
+                    <option value="" className="bg-[#1a1a1a]">None</option>
+                    {availableStudents.map(s => <option key={`event-s-${s.id}`} value={s.id} className="bg-[#1a1a1a]">{s.name} - {s.registration_number || s.id}</option>)}
+                  </select>
+                </div>
+              </>}
+
+              {manualStep === 'generated' && <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-5 space-y-3">
+                <div className="flex items-center gap-2 text-green-400 font-semibold"><CheckCircle size={20} /> Event report generated</div>
+                {requiredFields.length > 0 ? <p className="text-sm text-amber-200">These items were not available in the notes and should be completed manually in the downloaded report: {requiredFields.join(', ')}.</p> : <p className="text-sm text-gray-300">All detected report fields were populated from the notes.</p>}
+                <button onClick={() => handleDownload({ id: manualResult?.report_id, name: 'Event Report', type: 'Event Report' })} className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2"><Download size={16} /> Download Activity Report</button>
+              </div>}
+
+              {templateError && <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"><AlertTriangle size={16} />{templateError}</div>}
+              <button onClick={manualStep === 'generated' ? resetTemplateModal : handleEventReportGenerate} disabled={loading || (manualStep !== 'generated' && !meetingNotes.trim())} className="w-full h-12 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-900 disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-2">
+                {loading ? <RefreshCw size={18} className="animate-spin" /> : manualStep === 'generated' ? 'Finish' : <><FileText size={18} /> Generate Event Report</>}
+              </button>
+            </div>
+            <div className="h-1 w-full bg-gradient-to-r from-purple-600 via-[#d0ae61] to-purple-600" />
+          </div>
+        </div>
+      )}
+
+      {/* Legacy uploaded-template modal retained for the older endpoint but not shown in the Event Reports UI. */}
+      {false && isTemplateModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div
             className="bg-[#121212] rounded-2xl max-w-lg w-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10"
@@ -547,11 +665,15 @@ export const ReportsPage: React.FC = () => {
             <div className="px-8 pt-8 pb-6">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-2xl font-bold text-white font-display mb-1">Generate from Template</h2>
-                  <p className="text-gray-400 text-sm">Upload your PDF report format. AI fills the blanks with real data.</p>
+                  <h2 className="text-2xl font-bold text-white font-display mb-1">
+                    {manualStep === 'upload' ? 'Upload Report Template' : manualStep === 'review' ? 'Confirm Report Fields' : 'Review Generated Report'}
+                  </h2>
+                  <p className="text-gray-400 text-sm">
+                    {manualStep === 'upload' ? 'Upload the editable DOCX, then scan its required fields.' : manualStep === 'review' ? 'Edit detected values before generating the DOCX.' : 'The report is ready for review and download.'}
+                  </p>
                 </div>
                 <button
-                  onClick={() => setIsTemplateModalOpen(false)}
+                  onClick={resetTemplateModal}
                   className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
                 >
                   <X size={20} />
@@ -559,9 +681,9 @@ export const ReportsPage: React.FC = () => {
               </div>
 
               <div className="space-y-6">
-                {/* PDF Upload Zone */}
+                {manualStep === 'upload' && <>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2 ml-1">Report Template (PDF)</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2 ml-1">Report Template (DOCX)</label>
                   <div
                     className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ${isDragging
                       ? 'border-purple-400 bg-purple-400/10'
@@ -577,15 +699,15 @@ export const ReportsPage: React.FC = () => {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf"
+                      accept=".docx"
                       className="hidden"
                       onChange={(e) => handleTemplateFileChange(e.target.files?.[0] || null)}
                     />
                     {templateFile ? (
                       <div className="flex flex-col items-center gap-2">
                         <CheckCircle size={32} className="text-green-400" />
-                        <p className="text-white font-semibold text-sm">{templateFile.name}</p>
-                        <p className="text-gray-500 text-xs">{(templateFile.size / 1024).toFixed(1)} KB</p>
+                        <p className="text-white font-semibold text-sm">{templateFile?.name}</p>
+                        <p className="text-gray-500 text-xs">{((templateFile?.size || 0) / 1024).toFixed(1)} KB</p>
                         <button
                           onClick={(e) => { e.stopPropagation(); setTemplateFile(null); }}
                           className="text-xs text-red-400 hover:text-red-300 mt-1 underline"
@@ -599,8 +721,8 @@ export const ReportsPage: React.FC = () => {
                           <Upload size={24} className="text-purple-400" />
                         </div>
                         <div>
-                          <p className="text-white font-semibold text-sm">Drop your PDF here or click to browse</p>
-                          <p className="text-gray-500 text-xs mt-1">Only .pdf files accepted</p>
+                          <p className="text-white font-semibold text-sm">Drop your template here or click to browse</p>
+                          <p className="text-gray-500 text-xs mt-1">Only .docx files accepted to preserve formatting</p>
                         </div>
                       </div>
                     )}
@@ -641,6 +763,34 @@ export const ReportsPage: React.FC = () => {
                   </p>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2 ml-1">Meeting notes (optional)</label>
+                  <textarea value={meetingNotes} onChange={(e) => setMeetingNotes(e.target.value)} rows={3} placeholder="Add notes for the report summary..." className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                </div>
+                </>}
+
+                {manualStep === 'review' && <div className="space-y-4 max-h-[48vh] overflow-y-auto pr-1">
+                  {detectedFields.length === 0 && <p className="text-gray-400 text-sm">No standard fields were detected. You can still add meeting notes and generate the report.</p>}
+                  {detectedFields.map((field) => (
+                    <label key={field} className="block">
+                      <span className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2">{field.replace(/_/g, ' ')}</span>
+                      <input value={fieldOverrides[field] || ''} onChange={(e) => { setFieldOverrides(prev => ({ ...prev, [field]: e.target.value })); setRequiredFields(prev => prev.filter(item => item !== field || !!e.target.value.trim())); }} className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                      {requiredFields.includes(field) && <span className="block mt-1 text-xs text-amber-300">Needs teacher input; it could not be inferred safely.</span>}
+                    </label>
+                  ))}
+                  <label className="block">
+                    <span className="block text-xs font-bold uppercase tracking-widest text-purple-400 mb-2">Meeting notes</span>
+                    <textarea value={meetingNotes} onChange={(e) => setMeetingNotes(e.target.value)} rows={4} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                  </label>
+                </div>}
+
+                {manualStep === 'generated' && <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-green-400 font-semibold"><CheckCircle size={20} /> Manual report generated</div>
+                  <p className="text-sm text-gray-300">Review the report in the recent reports list, or download the DOCX now.</p>
+                  {requiredFields.length > 0 && <p className="text-xs text-amber-200">Fill these fields in the downloaded template before sharing: {requiredFields.join(', ')}.</p>}
+                  <button onClick={() => handleDownload({ id: manualResult?.report_id, name: 'Manual Report', type: 'Template Report' })} className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2"><Download size={16} /> Download DOCX</button>
+                </div>}
+
                 {/* Error display */}
                 {templateError && (
                   <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
@@ -650,8 +800,8 @@ export const ReportsPage: React.FC = () => {
                 )}
 
                 <button
-                  onClick={handleTemplateGenerate}
-                  disabled={loading || !templateFile}
+                  onClick={manualStep === 'upload' ? handleTemplateScan : manualStep === 'review' ? handleTemplateGenerate : resetTemplateModal}
+                  disabled={loading || (manualStep !== 'generated' && !templateFile)}
                   className="w-full h-14 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-900 disabled:text-gray-400 text-white font-bold rounded-xl flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_20px_-10px_rgba(147,51,234,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(147,51,234,0.6)] group mt-2"
                 >
                   {loading ? (
@@ -659,7 +809,7 @@ export const ReportsPage: React.FC = () => {
                   ) : (
                     <>
                       <FileText size={20} className="group-hover:scale-110 transition-transform" />
-                      Generate DOCX from Template
+                      {manualStep === 'upload' ? 'Scan Template Fields' : manualStep === 'review' ? 'Generate Manual DOCX' : 'Finish Review'}
                     </>
                   )}
                 </button>

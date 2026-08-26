@@ -9,6 +9,7 @@ If Groq is unavailable the pipeline raises early so the caller can notify the te
 
 import io
 import re
+import json
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
@@ -93,6 +94,24 @@ FIELD_PATTERNS: List[Tuple[re.Pattern, str]] = [
     (re.compile(r"(?i)grade\s*[:=\-]?\s*(.*)"), "grade"),
     (re.compile(r"(?i)parent\s*(?:\'s\s*)?(?:name)?\s*[:=\-]?\s*(.*)"), "parent_name"),
     (re.compile(r"(?i)contact\s*(?:no|number)?\s*[:=\-]?\s*(.*)"), "contact"),
+    (re.compile(r"(?i)type\s+of\s+activity\s*[:=\-]?\s*(.*)"), "activity_type"),
+    (re.compile(r"(?i)title\s+of\s+the\s+activity\s*[:=\-]?\s*(.*)"), "activity_title"),
+    (re.compile(r"(?i)date(?:/s|s)?\s*[:=\-]?\s*(.*)"), "activity_dates"),
+    (re.compile(r"(?i)time\s*[:=\-]?\s*(.*)"), "activity_time"),
+    (re.compile(r"(?i)venue\s*[:=\-]?\s*(.*)"), "venue"),
+    (re.compile(r"(?i)collaboration\s*/?\s*sponsor.*[:=\-]?\s*(.*)"), "collaboration_sponsor"),
+    (re.compile(r"(?i)name\s*[:=\-]?\s*(.*)"), "guest_name"),
+    (re.compile(r"(?i)title\s*/?\s*position\s*[:=\-]?\s*(.*)"), "guest_position"),
+    (re.compile(r"(?i)organization\s*[:=\-]?\s*(.*)"), "guest_organization"),
+    (re.compile(r"(?i)title\s+of\s+presentation\s*[:=\-]?\s*(.*)"), "presentation_title"),
+    (re.compile(r"(?i)type\s+of\s+participants\s*[:=\-]?\s*(.*)"), "participant_type"),
+    (re.compile(r"(?i)no\.\s+of\s+participants\s*[:=\-]?\s*(.*)"), "participant_count"),
+    (re.compile(r"(?i)highlights\s+of\s+the\s+activity\s*[:=\-]?\s*(.*)"), "highlights"),
+    (re.compile(r"(?i)key\s+takeaways\s*[:=\-]?\s*(.*)"), "key_takeaways"),
+    (re.compile(r"(?i)summary\s+of\s+the\s+activity\s*[:=\-]?\s*(.*)"), "activity_summary"),
+    (re.compile(r"(?i)follow\-?up\s+plan.*[:=\-]?\s*(.*)"), "follow_up_plan"),
+    (re.compile(r"(?i)name\s+of\s+the\s+rapporteur\s*[:=\-]?\s*(.*)"), "rapporteur_name"),
+    (re.compile(r"(?i)email\s+and\s+contact\s+no\s*[:=\-]?\s*(.*)"), "rapporteur_contact"),
 ]
 
 # Section heading patterns for free-text sections that Groq should curate
@@ -257,6 +276,233 @@ class ReportTemplateService:
             f"{len(template.standalone_fields)} standalone fields"
         )
         return template
+
+    @staticmethod
+    def extract_docx_template(docx_bytes: bytes) -> ExtractedTemplate:
+        """Extract the same lightweight structure from a DOCX template."""
+        document = DocxDocument(io.BytesIO(docx_bytes))
+        lines = [p.text.strip() for p in document.paragraphs if p.text.strip()]
+        for table in document.tables:
+            for row in table.rows:
+                lines.append("\t".join(cell.text.strip() for cell in row.cells))
+
+        template = ExtractedTemplate(raw_text="\n".join(lines))
+        if lines:
+            template.title = lines[0]
+        current_section: Optional[TemplateSection] = None
+        placeholder_re = re.compile(r"\{\{\s*([\w.-]+)\s*\}\}")
+        for index, text in enumerate(lines):
+            matches = placeholder_re.findall(text)
+            field_match = next((name for name in matches if name in {
+                field_name for _, field_name in FIELD_PATTERNS
+            }), None)
+            if field_match:
+                value = ""
+                field = TemplateField(field_match, value, True, 0, index)
+                (current_section.fields if current_section else template.standalone_fields).append(field)
+                continue
+            for pattern, field_name in FIELD_PATTERNS:
+                match = pattern.match(text)
+                if match:
+                    value = match.group(1).strip()
+                    field = TemplateField(field_name, value, _is_blank_value(value), 0, index)
+                    (current_section.fields if current_section else template.standalone_fields).append(field)
+                    break
+            else:
+                is_heading = text.isupper() or text.endswith(":") or (index == 0)
+                if is_heading and text != template.title:
+                    current_section = TemplateSection(text.rstrip(":"), page=0, y_position=index)
+                    template.sections.append(current_section)
+                elif current_section:
+                    current_section.content_lines.append(text)
+
+        for section in template.sections:
+            tab_lines = [line for line in section.content_lines if "\t" in line]
+            if len(tab_lines) >= 2:
+                section.is_table = True
+                section.table_headers = [part.strip() for part in tab_lines[0].split("\t")]
+                section.table_rows = [[part.strip() for part in line.split("\t")] for line in tab_lines[1:]]
+        return template
+
+    @staticmethod
+    def extract_template_from_bytes(template_bytes: bytes, filename: str) -> ExtractedTemplate:
+        if filename.lower().endswith(".docx"):
+            return ReportTemplateService.extract_docx_template(template_bytes)
+        return ReportTemplateService.extract_template(template_bytes)
+
+    @classmethod
+    def scan_template_fields(cls, template_bytes: bytes, filename: str) -> Dict[str, Any]:
+        """Return detected fields and editable initial values for the review step."""
+        template = cls.extract_template_from_bytes(template_bytes, filename)
+        fields: List[str] = []
+        mapping: Dict[str, str] = {}
+        for item in [*template.standalone_fields, *(field for section in template.sections for field in section.fields)]:
+            if item.label not in fields:
+                fields.append(item.label)
+                mapping[item.label] = "" if item.is_blank else item.value
+        return {"fields_detected": fields, "preview_mapping": mapping}
+
+    @classmethod
+    async def generate_with_overrides(
+        cls,
+        template_bytes: bytes,
+        filename: str,
+        meeting_notes: str = "",
+        field_overrides: Optional[Dict[str, Any]] = None,
+        target_type: str = "auto",
+        target_id: Optional[int] = None,
+    ) -> bytes:
+        """Fill the uploaded DOCX in place, retaining its styles and layout."""
+        if not filename.lower().endswith(".docx"):
+            raise ValueError("Exact formatting preservation requires a DOCX template. Please upload the editable DOCX version of this template.")
+        template = cls.extract_template_from_bytes(template_bytes, filename)
+        data = await cls.fetch_data_for_fields(template, target_type, target_id)
+        data.update(field_overrides or {})
+        generated_sections: Dict[str, str] = {}
+        for section in template.sections:
+            if section.heading.lower().strip() not in FREE_TEXT_SECTIONS:
+                continue
+            existing = "\n".join(section.content_lines)
+            context = f"Meeting/event notes:\n{meeting_notes}\n\nExisting text:\n{existing}"
+            if cls.check_groq_available():
+                generated_sections[section.heading] = cls.generate_section_content(section.heading, data, context)
+            elif meeting_notes:
+                generated_sections[section.heading] = meeting_notes
+        return cls.fill_docx_in_place(template_bytes, template, data, generated_sections)
+
+    @classmethod
+    async def generate_event_report_from_notes(cls, template_bytes: bytes, meeting_notes: str) -> Tuple[bytes, List[str]]:
+        """Fill the fixed activity-report DOCX from event notes without changing its structure."""
+        if not meeting_notes.strip():
+            raise ValueError("Meeting or event notes are required.")
+        if not cls.check_groq_available():
+            raise RuntimeError("Groq is unavailable. Event reports require Groq to interpret the meeting notes.")
+
+        field_names = [
+            "activity_type", "activity_title", "activity_dates", "activity_time", "venue",
+            "collaboration_sponsor", "guest_name", "guest_position", "guest_organization",
+            "presentation_title", "participant_type", "participant_count", "highlights",
+            "key_takeaways", "activity_summary", "follow_up_plan", "rapporteur_name",
+            "rapporteur_contact", "speaker_profiles", "descriptive_report", "participant_list",
+            "feedback", "session_photos", "poster",
+        ]
+        prompt = f"""You are completing a university activity report from meeting/event notes.
+Return ONLY a valid JSON object with exactly these keys:
+{', '.join(field_names)}
+
+MEETING/EVENT NOTES:
+{meeting_notes}
+
+Rules:
+- Extract every fact explicitly present in the notes.
+- For missing factual fields, return an empty string; never invent names, dates, counts, venues, or organizations.
+- Write polished formal university prose for highlights, key_takeaways, activity_summary, follow_up_plan, speaker_profiles, descriptive_report, and feedback using only the notes.
+- Keep factual fields concise and prose fields ready to paste into the report.
+- Do not invent photos, posters, participant names, or other attachments; return an empty string when they are not supplied.
+"""
+        try:
+            response = GroqService._client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=DEFAULT_MODEL,
+                temperature=0.25,
+                max_tokens=2200,
+            )
+            raw = response.choices[0].message.content.strip()
+            raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+            generated = json.loads(raw)
+            if not isinstance(generated, dict):
+                raise ValueError("Groq returned a non-object response")
+        except Exception as exc:
+            raise RuntimeError(f"Could not generate the activity report from notes: {exc}") from exc
+
+        data = {key: str(generated.get(key) or "").strip() for key in field_names}
+        missing = [key for key in field_names if not data[key]]
+        return cls.fill_event_docx_in_place(template_bytes, data), missing
+
+    @staticmethod
+    def fill_event_docx_in_place(docx_bytes: bytes, data: Dict[str, str]) -> bytes:
+        """Fill cells and placeholders in the supplied activity template in place."""
+        document = DocxDocument(io.BytesIO(docx_bytes))
+        label_map = {
+            "type of activity": "activity_type", "title of the activity": "activity_title",
+            "date/s": "activity_dates", "dates": "activity_dates", "time": "activity_time",
+            "venue": "venue", "collaboration/sponsor (if any)": "collaboration_sponsor",
+            "name": "guest_name", "title/position": "guest_position", "organization": "guest_organization",
+            "title of presentation": "presentation_title", "type of participants": "participant_type",
+            "no. of participants": "participant_count", "highlights of the activity": "highlights",
+            "key takeaways": "key_takeaways", "summary of the activity": "activity_summary",
+            "follow-up plan, if any": "follow_up_plan", "name of the rapporteur": "rapporteur_name",
+            "email and contact no": "rapporteur_contact", "feedback": "feedback",
+        }
+        narrative_map = {
+            "speaker profiles": "speaker_profiles", "descriptive report of the event": "descriptive_report",
+            "list of participants": "participant_list", "feedback": "feedback",
+            "session photos": "session_photos", "poster": "poster",
+        }
+
+        def normalized(text: str) -> str:
+            return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+
+        def replace_runs(paragraph: Any) -> None:
+            for run in paragraph.runs:
+                text = run.text
+                for key, value in data.items():
+                    if value:
+                        text = re.sub(r"\{\{\s*" + re.escape(key) + r"\s*\}\}", lambda _match: value, text)
+                run.text = text
+
+        def set_cell_value(cell: Any, value: str) -> None:
+            if not value:
+                return
+            paragraphs = cell.paragraphs
+            if paragraphs and paragraphs[0].runs:
+                paragraphs[0].runs[0].text = value
+                for run in paragraphs[0].runs[1:]:
+                    run.text = ""
+            elif paragraphs:
+                paragraphs[0].add_run(value)
+
+        for paragraph in document.paragraphs:
+            replace_runs(paragraph)
+        for table in document.tables:
+            for row in table.rows:
+                cells = row.cells
+                for index, cell in enumerate(cells):
+                    key = label_map.get(normalized(cell.text))
+                    if key and index + 1 < len(cells):
+                        set_cell_value(cells[index + 1], data.get(key, ""))
+                    for paragraph in cell.paragraphs:
+                        replace_runs(paragraph)
+
+        # Use the existing blank paragraph below each narrative heading. Never add a paragraph.
+        paragraphs = document.paragraphs
+        for index, paragraph in enumerate(paragraphs):
+            key = narrative_map.get(normalized(paragraph.text.rstrip(":")))
+            if not key or not data.get(key):
+                continue
+            for candidate in paragraphs[index + 1:]:
+                if candidate.text.strip():
+                    break
+                if candidate.runs:
+                    candidate.runs[0].text = data[key]
+                else:
+                    candidate.add_run(data[key])
+                break
+
+        output = io.BytesIO()
+        document.save(output)
+        return output.getvalue()
+
+    @staticmethod
+    def required_fields(template: ExtractedTemplate, data: Dict[str, Any]) -> List[str]:
+        """Identify fields that must be supplied by the teacher before download."""
+        missing = "[DATA NOT FOUND"
+        result: List[str] = []
+        for item in [*template.standalone_fields, *(field for section in template.sections for field in section.fields)]:
+            value = data.get(item.label, item.value)
+            if item.label not in result and (not value or str(value).startswith(missing) or _is_blank_value(str(value))):
+                result.append(item.label)
+        return result
 
     # -------------------------------------------------------------------
     # Step 2 — Map fields to MongoDB data
@@ -606,6 +852,76 @@ Write the content now:"""
         doc.save(buffer)
         buffer.seek(0)
         return buffer.read()
+
+    @staticmethod
+    def fill_docx_in_place(
+        docx_bytes: bytes,
+        template: ExtractedTemplate,
+        data: Dict[str, Any],
+        generated_sections: Dict[str, str],
+    ) -> bytes:
+        """Replace text inside the original DOCX; never rebuild its paragraphs or tables."""
+        document = DocxDocument(io.BytesIO(docx_bytes))
+        canonical_names = {field_name for _, field_name in FIELD_PATTERNS}
+
+        def write_paragraph(paragraph, replacements: Dict[str, Any]) -> None:
+            for run in paragraph.runs:
+                text = run.text
+                for key, value in replacements.items():
+                    if value is not None and not str(value).startswith("[DATA NOT FOUND"):
+                        text = text.replace("{{" + key + "}}", str(value))
+                        text = re.sub(r"\{\{\s*" + re.escape(key) + r"\s*\}\}", str(value), text)
+                        text = re.sub(
+                            r"(?i)(" + re.escape(key.replace("_", " ")) + r"\s*[:=-]\s*)([_ .-]{2,})",
+                            lambda match: match.group(1) + str(value),
+                            text,
+                        )
+                run.text = text
+
+        def paragraphs_in_document():
+            def walk_table(table):
+                for row in table.rows:
+                    for cell in row.cells:
+                        yield from cell.paragraphs
+                        for nested in cell.tables:
+                            yield from walk_table(nested)
+
+            yield from document.paragraphs
+            for table in document.tables:
+                yield from walk_table(table)
+            for section in document.sections:
+                yield from section.header.paragraphs
+                yield from section.footer.paragraphs
+                for table in section.header.tables:
+                    yield from walk_table(table)
+                for table in section.footer.tables:
+                    yield from walk_table(table)
+
+        replacements = {key: value for key, value in data.items() if key in canonical_names}
+        for paragraph in paragraphs_in_document():
+            write_paragraph(paragraph, replacements)
+
+        # Place Groq's prose only in an existing paragraph under the matching heading.
+        paragraphs = list(paragraphs_in_document())
+        for heading, content in generated_sections.items():
+            for index, paragraph in enumerate(paragraphs):
+                if paragraph.text.strip().rstrip(":").casefold() != heading.strip().rstrip(":").casefold():
+                    continue
+                for candidate in paragraphs[index + 1:]:
+                    if candidate.text.strip() and candidate.text.strip().isupper():
+                        break
+                    if any(pattern.match(candidate.text.strip()) for pattern, _ in FIELD_PATTERNS):
+                        continue
+                    if candidate.runs:
+                        candidate.runs[0].text = content
+                    else:
+                        candidate.add_run(content)
+                    break
+                break
+
+        output = io.BytesIO()
+        document.save(output)
+        return output.getvalue()
 
     # -------------------------------------------------------------------
     # Full pipeline

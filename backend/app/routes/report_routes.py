@@ -16,6 +16,7 @@ from pathlib import Path
 import uuid
 import datetime
 import os
+import json
 
 report_router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -240,6 +241,151 @@ async def send_report(report_id: str, req: SendReportRequest, background_tasks: 
 # ---------------------------------------------------------------------------
 
 UPLOAD_BASE = Path(__file__).resolve().parents[2] / "uploads"
+EVENT_REPORT_TEMPLATE = Path(__file__).resolve().parents[3] / "docs" / "report template.docx"
+
+ALLOWED_TEMPLATE_SUFFIXES = (".docx",)
+
+
+async def _read_template_upload(template_file: UploadFile) -> tuple[bytes, str]:
+    filename = template_file.filename or "template.pdf"
+    if not filename.lower().endswith(ALLOWED_TEMPLATE_SUFFIXES):
+        raise HTTPException(status_code=400, detail="Upload the editable DOCX template so its formatting can be preserved exactly.")
+    return await template_file.read(), filename
+
+
+@report_router.post("/scan-template")
+async def scan_template(
+    template_file: UploadFile = File(...),
+    meeting_notes: str = Form(""),
+    target_id: Optional[int] = Form(None),
+    target_type: str = Form("auto"),
+):
+    """Inspect a DOCX template before any report is created."""
+    content, filename = await _read_template_upload(template_file)
+    try:
+        result = ReportTemplateService.scan_template_fields(content, filename)
+        template = ReportTemplateService.extract_template_from_bytes(content, filename)
+        data = await ReportTemplateService.fetch_data_for_fields(template, target_type, target_id)
+        result["preview_mapping"] = {
+            field: (data.get(field) if data.get(field) and not str(data.get(field)).startswith("[DATA NOT FOUND") else result["preview_mapping"].get(field, ""))
+            for field in result["fields_detected"]
+        }
+        result["fields_requiring_teacher"] = ReportTemplateService.required_fields(template, data)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not scan template: {exc}") from exc
+    result["meeting_notes"] = meeting_notes
+    return result
+
+
+@report_router.post("/generate-event")
+async def generate_event_report(
+    meeting_notes: str = Form(...),
+    target_id: Optional[int] = Form(None),
+):
+    """Generate an activity report from notes using the fixed university template."""
+    if not EVENT_REPORT_TEMPLATE.exists():
+        raise HTTPException(status_code=500, detail="The fixed activity report template is missing from the deployment.")
+    try:
+        docx_bytes, fields_requiring_teacher = await ReportTemplateService.generate_event_report_from_notes(
+            EVENT_REPORT_TEMPLATE.read_bytes(), meeting_notes
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Event report generation failed: {exc}") from exc
+
+    output_dir = UPLOAD_BASE / "generated_reports"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    token = uuid.uuid4().hex
+    output_path = output_dir / f"{token}_event_report.docx"
+    output_path.write_bytes(docx_bytes)
+    report_id = f"ER-{str(uuid.uuid4())[:6].upper()}"
+    report = Report(
+        report_id=report_id,
+        name="Event Report",
+        type="Event Report",
+        status="ready",
+        target_id=target_id,
+        template_path="/docs/report template.docx",
+        docx_path=f"/uploads/generated_reports/{output_path.name}",
+        content="Activity report generated from meeting/event notes using the university template.",
+    )
+    await report.assign_id()
+    await report.insert()
+    return {
+        "message": "Event report generated",
+        "report_id": report_id,
+        "status": "ready",
+        "fields_requiring_teacher": fields_requiring_teacher,
+    }
+
+
+@report_router.post("/generate-manual")
+async def generate_manual_report(
+    template_file: UploadFile = File(...),
+    meeting_notes: str = Form(""),
+    field_overrides: str = Form("{}"),
+    target_id: Optional[int] = Form(None),
+    target_type: str = Form("auto"),
+):
+    """Generate and store a teacher-confirmed manual report immediately."""
+    content, filename = await _read_template_upload(template_file)
+    try:
+        overrides = json.loads(field_overrides or "{}")
+        if not isinstance(overrides, dict):
+            raise ValueError("field_overrides must be a JSON object")
+        docx_bytes = await ReportTemplateService.generate_with_overrides(
+            content,
+            filename,
+            meeting_notes=meeting_notes,
+            field_overrides=overrides,
+            target_type=target_type,
+            target_id=target_id,
+        )
+        template = ReportTemplateService.extract_template_from_bytes(content, filename)
+        generated_data = await ReportTemplateService.fetch_data_for_fields(template, target_type, target_id)
+        generated_data.update(overrides)
+        required_fields = ReportTemplateService.required_fields(template, generated_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid field overrides: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {exc}") from exc
+
+    template_dir = UPLOAD_BASE / "report_templates"
+    output_dir = UPLOAD_BASE / "generated_reports"
+    template_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    token = uuid.uuid4().hex
+    template_path = template_dir / f"{token}_{filename.replace(' ', '_')}"
+    output_path = output_dir / f"{token}_manual_report.docx"
+    template_path.write_bytes(content)
+    output_path.write_bytes(docx_bytes)
+
+    report_id = f"MR-{str(uuid.uuid4())[:6].upper()}"
+    report = Report(
+        report_id=report_id,
+        name="Manual Report",
+        type="Manual Report",
+        status="ready",
+        target_id=target_id,
+        template_path=f"/uploads/report_templates/{template_path.name}",
+        docx_path=f"/uploads/generated_reports/{output_path.name}",
+        content="Teacher-confirmed report generated from the uploaded template.",
+    )
+    await report.assign_id()
+    await report.insert()
+    return {
+        "message": "Manual report generated",
+        "report_id": report_id,
+        "status": "ready",
+        "filename": output_path.name,
+        "preview": {"fields": overrides, "meeting_notes": meeting_notes},
+        "fields_requiring_teacher": required_fields,
+    }
 
 async def generate_from_template_background(report_db_id: int, pdf_path: str, target_id: int | None):
     """Background task: run the full template pipeline and save DOCX."""
