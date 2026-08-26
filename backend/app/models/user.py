@@ -30,8 +30,6 @@ class User(Document):
     registration_number: Optional[str] = None
     department: Optional[str] = None
     last_active: Optional[datetime] = None
-    google_refresh_token: Optional[str] = None
-    google_calendar_synced: bool = False
 
     class Settings:
         name = "users"

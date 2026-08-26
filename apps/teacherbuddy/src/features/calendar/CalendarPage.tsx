@@ -14,9 +14,7 @@ import {
   Loader2,
   Trash2,
   Edit2,
-  BellRing,
-  RefreshCw,
-  Cloud
+  BellRing
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 
@@ -82,9 +80,6 @@ export const CalendarPage: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [notifications, setNotifications] = useState<CalendarNotification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [googleSyncing, setGoogleSyncing] = useState(false);
-  const [googleMessage, setGoogleMessage] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [search, setSearch] = useState("");
@@ -132,61 +127,6 @@ export const CalendarPage: React.FC = () => {
   useEffect(() => {
     fetchEventsAndNotifications();
   }, [fetchEventsAndNotifications]);
-
-  const fetchGoogleStatus = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_ENDPOINTS.CALENDAR}/google-status`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (response.ok) setGoogleConnected((await response.json()).connected === true);
-    } catch (err) {
-      console.error("Failed to fetch Google Calendar status:", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchGoogleStatus();
-    if (new URLSearchParams(window.location.search).get("google_calendar") === "connected") {
-      setGoogleMessage("Google Calendar connected. You can sync your events now.");
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, [fetchGoogleStatus]);
-
-  const syncGoogleCalendar = async () => {
-    setGoogleMessage("");
-    if (!googleConnected) {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch(`${API_ENDPOINTS.AUTH}/google-calendar/connect`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || "Google Calendar is unavailable");
-        window.location.assign(data.authorization_url);
-      } catch (err) {
-        setGoogleMessage(err instanceof Error ? err.message : "Unable to connect Google Calendar");
-      }
-      return;
-    }
-
-    setGoogleSyncing(true);
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_ENDPOINTS.CALENDAR}/sync-google`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Google Calendar sync failed");
-      setGoogleMessage(`Synced ${data.imported || 0} from Google and ${data.exported || 0} to Google.`);
-      await fetchEventsAndNotifications();
-    } catch (err) {
-      setGoogleMessage(err instanceof Error ? err.message : "Google Calendar sync failed");
-    } finally {
-      setGoogleSyncing(false);
-    }
-  };
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -421,10 +361,6 @@ export const CalendarPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button onClick={syncGoogleCalendar} className="btn btn-outline" disabled={googleSyncing}>
-            {googleSyncing ? <RefreshCw size={16} className="animate-spin" /> : <Cloud size={16} />}
-            {googleConnected ? "Sync Google Calendar" : "Connect Google Calendar"}
-          </button>
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-text-muted)" }} />
             <input
@@ -440,12 +376,6 @@ export const CalendarPage: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {googleMessage && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          {googleMessage}
-        </div>
-      )}
 
       {/* Notifications Banner */}
       {notifications.length > 0 && (

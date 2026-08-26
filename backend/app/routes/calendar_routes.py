@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from app.models.calendar import CalendarEvent
 from app.models.user import User
 from app.utils.auth import get_current_user
-from app.services.google_calendar_service import GoogleCalendarConfigurationError, GoogleCalendarService
 
 # ── Pydantic Schemas ─────────────────────────────────────────
 class CalendarEventCreate(BaseModel):
@@ -48,25 +47,6 @@ class CalendarEventUpdate(BaseModel):
 
 calendar_router = APIRouter(prefix="/calendar", tags=["Calendar"])
 logger = logging.getLogger(__name__)
-
-
-@calendar_router.get("/google-status")
-async def google_calendar_status(current_user: User = Depends(get_current_user)):
-    return {
-        "connected": bool(current_user.google_refresh_token),
-        "synced": bool(current_user.google_calendar_synced),
-    }
-
-
-@calendar_router.post("/sync-google")
-async def sync_google_calendar(current_user: User = Depends(get_current_user)):
-    try:
-        return await GoogleCalendarService().sync_bidirectional(current_user)
-    except GoogleCalendarConfigurationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        logger.exception("Google Calendar sync failed")
-        raise HTTPException(status_code=502, detail=f"Google Calendar sync failed: {exc}") from exc
 
 
 def _same_identity(left: Optional[str], right: Optional[str]) -> bool:
