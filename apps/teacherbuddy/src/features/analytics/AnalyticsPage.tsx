@@ -556,7 +556,7 @@ export const AnalyticsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-900 to-blue-600 bg-clip-text text-transparent" style={{ fontFamily: "var(--font-display)" }}>
-            {activeTab === "risk" ? "Global Risk Intelligence" : "Risk Intelligence Dashboard"}
+            Risk Intelligence Dashboard
           </h1>
           <p className="text-sm text-slate-500 mt-1">Real-time performance monitoring and predictive risk analytics.</p>
         </div>
