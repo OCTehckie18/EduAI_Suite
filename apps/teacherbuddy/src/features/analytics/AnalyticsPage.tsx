@@ -3,8 +3,7 @@ import {
   BarChart3, TrendingUp, AlertTriangle, Users, Download,
   ChevronDown, Filter, RefreshCw, Activity, ArrowUp, ArrowDown,
   BrainCircuit, Eye, Info, Upload, FileSpreadsheet, Check, X,
-  PieChart as PieChartIcon, LayoutDashboard, Database,
-  CheckCircle2, Award, Target
+  PieChart as PieChartIcon, LayoutDashboard, Database
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { 
@@ -279,20 +278,16 @@ export const AnalyticsPage: React.FC = () => {
 
     const stats = dataSource === "platform" 
       ? [
-          { label: "Class Average", value: analytics?.overview?.avg_score || "0%", color: "#264796", icon: <TrendingUp size={16}/> },
+          { label: "Average Score", value: analytics?.overview?.avg_score || "0%", color: "#264796", icon: <TrendingUp size={16}/> },
           { label: "Total Students", value: analytics?.overview?.total_students || 0, color: "#16a34a", icon: <Users size={16}/> },
           { label: "At-Risk Count", value: analytics?.overview?.at_risk_count || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
-          { label: "Pass Rate", value: (analytics?.overview as any)?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
-          { label: "High Score", value: (analytics?.overview as any)?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
-          { label: "Low Score", value: (analytics?.overview as any)?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
+          { label: "Average Attendance", value: analytics?.overview?.attendance_rate || "0%", color: "#d97706", icon: <Activity size={16}/> },
         ]
       : [
-          { label: "Class Average", value: `${uploadedData?.summary?.avg_score}${uploadedData?.summary?.scale === 100 ? '%' : ''}`, color: "#264796", icon: <TrendingUp size={16}/> },
+          { label: "Average Score", value: `${uploadedData?.summary?.avg_score}${uploadedData?.summary?.scale === 100 ? '%' : ''}`, color: "#264796", icon: <TrendingUp size={16}/> },
           { label: "Total Students", value: uploadedData?.summary?.rows || 0, color: "#16a34a", icon: <Users size={16}/> },
           { label: "At-Risk", value: uploadedData?.risk_students?.length || 0, color: "#dc2626", icon: <AlertTriangle size={16}/> },
-          { label: "Pass Rate", value: uploadedData?.summary?.pass_rate || "N/A", color: "#1d4ed8", icon: <CheckCircle2 size={16}/> },
-          { label: "High Score", value: uploadedData?.summary?.high_score || "N/A", color: "#d97706", icon: <Award size={16}/> },
-          { label: "Low Score", value: uploadedData?.summary?.low_score || "N/A", color: "#9333ea", icon: <Target size={16}/> },
+          { label: "Attendance", value: "Not in upload", color: "#64748b", icon: <Activity size={16}/> },
         ];
 
     return (
