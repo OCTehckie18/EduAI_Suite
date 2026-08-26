@@ -10,14 +10,15 @@ from groq import Groq
 logger = logging.getLogger(__name__)
 
 # Get from environment at runtime
-# List of models in fallback order (newer models first, older as fallback)
+# List of models in fallback order. Override the default with GROQ_MODEL when
+# a deployment needs a different model available to its Groq account.
 AVAILABLE_MODELS = [
-    "llama-3.3-70b-versatile",  # Current working model
-    "llama-3.1-70b-versatile",  # Alternative
-    "llama-3.1-8b-instant",     # Faster alternative
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.6-27b",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
 ]
 
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", AVAILABLE_MODELS[0])
 VISION_MODELS = [
     "llama-3.2-11b-vision-preview",
     "llama-3.2-90b-vision-preview",

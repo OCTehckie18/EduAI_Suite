@@ -7,7 +7,7 @@ from app.models.submission import Submission
 from app.models.exam import ExamAttempt, Exam
 from app.models.assignment import Assignment
 from app.models.user import User
-from app.services.groq_service import GroqService
+from app.services.groq_service import GroqService, DEFAULT_MODEL
 from app.services.report_template_service import ReportTemplateService
 from app.utils.email_utils import send_email
 from pydantic import BaseModel
@@ -127,7 +127,7 @@ async def generate_report_background(report_db_id: int, type: str, target_id: in
             
             message = GroqService._client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="llama-3.3-70b-versatile",
+                model=DEFAULT_MODEL,
                 temperature=0.7,
                 max_tokens=1500,
             )
@@ -166,7 +166,7 @@ async def generate_report_background(report_db_id: int, type: str, target_id: in
             
             message = GroqService._client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="llama-3.3-70b-versatile",
+                model=DEFAULT_MODEL,
                 temperature=0.7,
                 max_tokens=1500,
             )
