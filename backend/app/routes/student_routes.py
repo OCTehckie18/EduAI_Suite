@@ -4,9 +4,9 @@ from app.models.course import Course
 from app.schemas.student import StudentCreate, StudentResponse
 import csv
 import io
-import random
 
 student_router = APIRouter(prefix="/students", tags=["Students"])
+
 
 @student_router.get("/", response_model=list[StudentResponse])
 async def get_all_students():
@@ -18,6 +18,7 @@ async def get_all_students():
         result.append(StudentResponse(**d))
     return result
 
+
 @student_router.get("/{course_id}", response_model=list[StudentResponse])
 async def get_students(course_id: int):
     students = await Student.find(Student.course_id == course_id).to_list()
@@ -27,6 +28,7 @@ async def get_students(course_id: int):
         d["id"] = s.int_id
         result.append(StudentResponse(**d))
     return result
+
 
 @student_router.post("/{course_id}", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def manual_enroll(course_id: int, student: StudentCreate):
@@ -39,24 +41,25 @@ async def manual_enroll(course_id: int, student: StudentCreate):
         Student.email == student.email
     )
     if existing_student:
-        raise HTTPException(status_code=409, detail="Student with this email is already enrolled in this course")
+        raise HTTPException(
+            status_code=409, detail="Student with this email is already enrolled in this course")
 
-    import random
     new_student = Student(
-        **student.model_dump(), 
+        **student.model_dump(),
         course_id=course_id,
-        attendance=random.randint(60, 98),
-        avg_score=random.randint(55, 95)
+        attendance=0,
+        avg_score=0
     )
     await new_student.assign_id()
     await new_student.insert()
 
     course.students = (course.students or 0) + 1
     await course.save()
-    
+
     d = new_student.model_dump()
     d["id"] = new_student.int_id
     return StudentResponse(**d)
+
 
 @student_router.post("/bulk_upload/{course_id}", status_code=status.HTTP_201_CREATED)
 async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
@@ -70,7 +73,7 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
 
     contents = await file.read()
     filename = file.filename.lower()
-    
+
     text_content = ""
     try:
         if filename.endswith(".xlsx"):
@@ -79,39 +82,49 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
         elif filename.endswith(".csv") or filename.endswith(".txt"):
             text_content = contents.decode("utf-8", errors="ignore")
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file format")
+            raise HTTPException(
+                status_code=400, detail="Unsupported file format")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Error reading file: {str(e)}")
 
     students_to_add = []
     existing_students = await Student.find(Student.course_id == course_id).to_list()
     existing_emails = {s.email.lower() for s in existing_students if s.email}
     seen_emails_in_file = set()
-    
+
     for line in text_content.split('\n'):
         line = line.strip()
         if not line:
             continue
-            
-        email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', line)
+
+        email_match = re.search(
+            r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', line)
         if not email_match:
             continue
         email = email_match.group(0)
-        
+
         # Regex for Reg/Roll Number
-        reg_match = re.search(r'(?i)(?:reg(?:ister)?|roll|id)?[\s#:\.-]*\b([A-Z0-9]*\d[A-Z0-9]*)\b', line)
-        reg_num = reg_match.group(1).replace('"', '').strip() if reg_match else "UNKNOWN"
-        
+        reg_match = re.search(
+            r'(?i)(?:reg(?:ister)?|roll|id)?[\s#:\.-]*\b([A-Z0-9]*\d[A-Z0-9]*)\b', line)
+        reg_num = reg_match.group(1).replace(
+            '"', '').strip() if reg_match else "UNKNOWN"
+
         # Regex for Department
-        dept_match = re.search(r'(?i)(?:dept|department)[\s:\.-]*([a-zA-Z\s]+)(?:,|;|$)', line)
-        dept = dept_match.group(1).replace('"', '').strip() if dept_match else "General"
-        
+        dept_match = re.search(
+            r'(?i)(?:dept|department)[\s:\.-]*([a-zA-Z\s]+)(?:,|;|$)', line)
+        dept = dept_match.group(1).replace(
+            '"', '').strip() if dept_match else "General"
+
         # Regex for Class
-        class_match = re.search(r'(?i)(?:class|batch|section)[\s:\.-]*([a-zA-Z0-9\s-]+)(?:,|;|$)', line)
-        student_class = class_match.group(1).replace('"', '').strip() if class_match else "General"
-        
+        class_match = re.search(
+            r'(?i)(?:class|batch|section)[\s:\.-]*([a-zA-Z0-9\s-]+)(?:,|;|$)', line)
+        student_class = class_match.group(1).replace(
+            '"', '').strip() if class_match else "General"
+
         # Regex for Name
-        name_match = re.search(r'(?i)(?:name|student)[\s:\.-]*([a-zA-Z\s]+)(?:,|;|$)', line)
+        name_match = re.search(
+            r'(?i)(?:name|student)[\s:\.-]*([a-zA-Z\s]+)(?:,|;|$)', line)
         if name_match:
             name = name_match.group(1).replace('"', '').strip()
         else:
@@ -126,7 +139,8 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
                 name = " ".join(words[:2]) if words else "Student"
 
         # Tabular fallback: if line is comma-separated, try extracting fixed indices
-        csv_match = re.match(r'^([^,]+),([^,]+),([^,]+@[^,]+),([^,]+),([^,]+)$', line)
+        csv_match = re.match(
+            r'^([^,]+),([^,]+),([^,]+@[^,]+),([^,]+),([^,]+)$', line)
         if csv_match:
             reg_num = csv_match.group(1).replace('"', '').strip()
             name = csv_match.group(2).replace('"', '').strip()
@@ -135,7 +149,7 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
 
         if email.lower() in existing_emails or email.lower() in seen_emails_in_file:
             continue
-            
+
         seen_emails_in_file.add(email.lower())
 
         new_student = Student(
@@ -145,20 +159,22 @@ async def bulk_enroll(course_id: int, file: UploadFile = File(...)):
             email=email[:50],
             student_class=student_class[:50],
             department=dept[:50],
-            attendance=random.randint(60, 98),
-            avg_score=random.randint(55, 95)
+            attendance=0,
+            avg_score=0
         )
         await new_student.assign_id()
         students_to_add.append(new_student)
 
     if not students_to_add:
-        raise HTTPException(status_code=400, detail="Could not extract student details using regex.")
+        raise HTTPException(
+            status_code=400, detail="Could not extract student details using regex.")
 
     await Student.insert_many(students_to_add)
     course.students = (course.students or 0) + len(students_to_add)
     await course.save()
-    
+
     return {"message": f"Successfully enrolled {len(students_to_add)} students"}
+
 
 @student_router.post("/enroll/code", status_code=status.HTTP_201_CREATED)
 async def enroll_via_code(enrollment_code: str, student: StudentCreate):
@@ -171,24 +187,25 @@ async def enroll_via_code(enrollment_code: str, student: StudentCreate):
         Student.email == student.email
     )
     if existing_student:
-        raise HTTPException(status_code=409, detail="Student with this email is already enrolled in this course")
+        raise HTTPException(
+            status_code=409, detail="Student with this email is already enrolled in this course")
 
-    import random
     new_student = Student(
-        **student.model_dump(), 
+        **student.model_dump(),
         course_id=course.int_id,
-        attendance=random.randint(60, 98),
-        avg_score=random.randint(55, 95)
+        attendance=0,
+        avg_score=0
     )
     await new_student.assign_id()
     await new_student.insert()
 
     course.students = (course.students or 0) + 1
     await course.save()
-    
+
     d = new_student.model_dump()
     d["id"] = new_student.int_id
     return StudentResponse(**d)
+
 
 @student_router.get("/{course_id}/active", response_model=list[StudentResponse])
 async def get_active_students(course_id: int):
@@ -208,6 +225,7 @@ async def get_active_students(course_id: int):
         d["id"] = s.int_id
         result.append(StudentResponse(**d))
     return result
+
 
 @student_router.delete("/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student(student_id: int):
