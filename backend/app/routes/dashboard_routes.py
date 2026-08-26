@@ -9,6 +9,8 @@ from app.models.submission import Submission
 from app.models.lesson import Lesson
 from app.models.assignment import Assignment
 from app.models.calendar import CalendarEvent
+from app.models.report import Report
+from app.models.mail import MailHistory
 from datetime import datetime, date, timedelta
 from typing import Optional
 
@@ -33,6 +35,11 @@ def _parse_date_safe(value: str) -> Optional[datetime]:
         except (ValueError, AttributeError):
             continue
     return None
+
+
+def _same_identity(left: Optional[str], right: Optional[str]) -> bool:
+    normalize = lambda value: " ".join((value or "").split()).casefold()
+    return bool(normalize(left)) and normalize(left) == normalize(right)
 
 @dashboard_router.get("/summary")
 async def get_dashboard_summary(teacher_name: Optional[str] = None):
@@ -188,10 +195,62 @@ async def get_dashboard_summary(teacher_name: Optional[str] = None):
             "color": color_map.get(h.feature, color_map["default"])
         })
 
-    # 5. Today's Schedule
     today_start = datetime.combine(date.today(), datetime.min.time())
     today_end = today_start + timedelta(days=1)
-    
+
+    # Cross-tab dashboard data
+    all_appointments = await Appointment.find_all().sort("-int_id").to_list()
+    visible_appointments = [
+        appointment
+        for appointment in all_appointments
+        if not teacher_name or _same_identity(appointment.teacher_name, teacher_name)
+    ]
+    pending_appointments = [
+        appointment for appointment in visible_appointments if appointment.status == "pending"
+    ][:5]
+
+    recent_reports = await Report.find_all().sort("-generated_at").limit(3).to_list()
+
+    mail_week_start = datetime.now() - timedelta(days=7)
+    mails_this_week = await MailHistory.find(
+        MailHistory.sent_at >= mail_week_start
+    ).count()
+    last_mail = await MailHistory.find_all().sort("-sent_at").first_or_none()
+
+    upcoming_exams_query = Exam.find_all().sort("-created_at")
+    if teacher_course_ids:
+        upcoming_exams_query = upcoming_exams_query.find(
+            {"course_id": {"$in": teacher_course_ids}}
+        )
+    upcoming_exams = await upcoming_exams_query.limit(3).to_list()
+
+    avg_attendance = round(
+        sum((student.attendance or 0) for student in students) / len(students), 1
+    ) if students else 0
+    avg_student_score = round(
+        sum((student.avg_score or 0) for student in students) / len(students), 1
+    ) if students else 0
+    engagement_snapshot = {
+        "avgAttendance": avg_attendance,
+        "avgScore": avg_student_score,
+        "atRiskCount": sum(
+            1 for student in students
+            if (student.avg_score or 0) < 40 or (0 < (student.attendance or 0) < 50)
+        ),
+        "studentCount": len(students),
+    }
+
+    week_end = today_start + timedelta(days=7)
+    calendar_events_this_week = await CalendarEvent.find(
+        {"start_time": {"$gte": today_start, "$lt": week_end}}
+    ).count()
+    appointment_events_this_week = 0
+    for appointment in visible_appointments:
+        appointment_date = _parse_date_safe(appointment.time_slot or "")
+        if appointment_date and today_start <= appointment_date < week_end:
+            appointment_events_this_week += 1
+
+    # 5. Today's Schedule
     schedule_items = []
 
     # 5a. Appointments
@@ -315,7 +374,43 @@ async def get_dashboard_summary(teacher_name: Optional[str] = None):
         "classrooms": classrooms,
         "riskAlerts": risk_alerts,
         "recentActivity": recent_activity,
-        "schedule": schedule
+        "schedule": schedule,
+        "pendingAppointments": [
+            {
+                "id": appointment.int_id,
+                "studentName": appointment.student_name or "Student",
+                "agenda": appointment.agenda or "Appointment request",
+                "timeSlot": appointment.time_slot,
+                "status": appointment.status,
+            }
+            for appointment in pending_appointments
+        ],
+        "recentReports": [
+            {
+                "id": report.report_id or report.int_id,
+                "name": report.name or report.type or "Report",
+                "status": report.status,
+                "generatedAt": report.generated_at.isoformat() if report.generated_at else None,
+            }
+            for report in recent_reports
+        ],
+        "mailStats": {
+            "sentThisWeek": mails_this_week,
+            "lastSentAt": last_mail.sent_at.isoformat() if last_mail else None,
+        },
+        "upcomingExams": [
+            {
+                "id": exam.int_id,
+                "title": exam.title or "Untitled exam",
+                "courseId": exam.course_id,
+                "scheduledAt": exam.created_at.isoformat() if exam.created_at else None,
+                "status": exam.status,
+            }
+            for exam in upcoming_exams
+        ],
+        "engagementSnapshot": engagement_snapshot,
+        "calendarEventsToday": len(schedule),
+        "calendarEventsThisWeek": calendar_events_this_week + appointment_events_this_week,
     }
 
 @dashboard_router.get("/discoverable-classrooms")
