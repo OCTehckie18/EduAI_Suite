@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
   Users, BrainCircuit, AlertTriangle, TrendingUp, BookOpen,
-  Clock, ArrowRight, Activity, Star, Calendar, CheckCircle2,
-  Zap, BarChart2, User, Loader2
+  Clock, ArrowRight, Activity, Calendar, CheckCircle2,
+  Zap, BarChart2, User, Loader2, Mail, FileText, ClipboardList,
+  Plus, XCircle
 } from "lucide-react";
 import { GlassCard } from "../../shared/components/GlassCard";
 import { Link } from "react-router-dom";
@@ -31,6 +32,33 @@ export const DashboardPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const updateAppointment = async (appointmentId: number, status: "approved" | "rejected") => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.APPOINTMENTS}/${appointmentId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(localStorage.getItem("token")
+            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+            : {}),
+        },
+        body: JSON.stringify({
+          status,
+          notes: status === "approved" ? "Approved from dashboard." : "Rejected from dashboard.",
+        }),
+      });
+      if (!response.ok) throw new Error("Could not update appointment");
+      setData((previous: any) => ({
+        ...previous,
+        pendingAppointments: (previous.pendingAppointments || []).filter(
+          (appointment: any) => appointment.id !== appointmentId,
+        ),
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update appointment");
+    }
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -74,7 +102,19 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const { stats, classrooms, riskAlerts, recentActivity, schedule } = data;
+  const {
+    stats = [],
+    classrooms = [],
+    riskAlerts = [],
+    recentActivity = [],
+    schedule = [],
+    pendingAppointments = [],
+    recentReports = [],
+    mailStats = { sentThisWeek: 0, lastSentAt: null },
+    upcomingExams = [],
+    engagementSnapshot = { avgAttendance: 0, avgScore: 0, atRiskCount: 0, studentCount: 0 },
+    calendarEventsThisWeek = 0,
+  } = data;
 
   return (
     <div className="space-y-7 animate-fade-in">
@@ -88,14 +128,27 @@ export const DashboardPage: React.FC = () => {
             {getFormattedDate()} — Here's your academic overview for today.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/exams" className="btn btn-outline text-xs">
-            <FileTextIcon size={13} /> Schedule Exam
-          </Link>
-          <Link to="/analytics" className="btn btn-primary text-xs">
-            <BarChart2 size={13} /> View Analytics
-          </Link>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link to="/exams" className="btn btn-outline text-xs"><Plus size={13} /> Create Exam</Link>
+          <Link to="/mail" className="btn btn-outline text-xs"><Mail size={13} /> Send Mail</Link>
+          <Link to="/reports" className="btn btn-outline text-xs"><FileText size={13} /> Generate Report</Link>
+          <Link to="/appointments" className="btn btn-primary text-xs"><Calendar size={13} /> Schedule Appointment</Link>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Link to="/exams" className="glass-card flex items-center gap-3 p-3 transition hover:-translate-y-0.5">
+          <Plus size={16} className="text-blue-600" /><span className="text-xs font-bold">Create Exam</span>
+        </Link>
+        <Link to="/mail" className="glass-card flex items-center gap-3 p-3 transition hover:-translate-y-0.5">
+          <Mail size={16} className="text-indigo-600" /><span className="text-xs font-bold">Send Mail</span>
+        </Link>
+        <Link to="/reports" className="glass-card flex items-center gap-3 p-3 transition hover:-translate-y-0.5">
+          <FileText size={16} className="text-amber-600" /><span className="text-xs font-bold">Generate Report</span>
+        </Link>
+        <Link to="/appointments" className="glass-card flex items-center gap-3 p-3 transition hover:-translate-y-0.5">
+          <Calendar size={16} className="text-emerald-600" /><span className="text-xs font-bold">Appointments</span>
+        </Link>
       </div>
 
       {/* Stats Grid */}
@@ -274,6 +327,78 @@ export const DashboardPage: React.FC = () => {
             </div>
           </GlassCard>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <GlassCard padding="sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2"><Calendar size={15} className="text-amber-600" /><h3 className="section-title text-sm">Pending Appointments</h3></div>
+            <Link to="/appointments" className="text-[10px] font-semibold text-blue-600">View All →</Link>
+          </div>
+          <div className="space-y-2">
+            {pendingAppointments.length === 0 ? <p className="py-4 text-center text-xs italic text-muted-foreground">No pending requests.</p> : pendingAppointments.slice(0, 3).map((appointment: any) => (
+              <div key={appointment.id} className="rounded-lg border p-2.5" style={{ borderColor: "var(--color-border)" }}>
+                <p className="truncate text-xs font-semibold">{appointment.studentName}</p>
+                <p className="truncate text-[10px] text-muted-foreground">{appointment.agenda} · {appointment.timeSlot || "Time pending"}</p>
+                <div className="mt-2 flex gap-2">
+                  <button onClick={() => void updateAppointment(appointment.id, "approved")} className="btn btn-primary flex-1 py-1 text-[10px]">Approve</button>
+                  <button onClick={() => void updateAppointment(appointment.id, "rejected")} className="btn btn-outline flex-1 py-1 text-[10px]"><XCircle size={12} /> Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+
+        <GlassCard padding="sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2"><FileText size={15} className="text-blue-600" /><h3 className="section-title text-sm">Recent Reports</h3></div>
+            <Link to="/reports" className="text-[10px] font-semibold text-blue-600">View All →</Link>
+          </div>
+          <div className="space-y-2">
+            {recentReports.length === 0 ? <p className="py-4 text-center text-xs italic text-muted-foreground">No reports generated.</p> : recentReports.map((report: any) => (
+              <div key={report.id} className="flex items-center justify-between rounded-lg border p-2.5" style={{ borderColor: "var(--color-border)" }}>
+                <p className="truncate text-xs font-semibold">{report.name}</p>
+                <span className="badge badge-blue text-[9px]">{report.status}</span>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+
+        <GlassCard padding="sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2"><Mail size={15} className="text-indigo-600" /><h3 className="section-title text-sm">Mail Activity</h3></div>
+            <Link to="/mail" className="text-[10px] font-semibold text-blue-600">View All →</Link>
+          </div>
+          <p className="text-3xl font-black">{mailStats.sentThisWeek}</p>
+          <p className="text-xs text-muted-foreground">emails sent this week</p>
+          <p className="mt-3 text-[10px] text-muted-foreground">Last sent: {mailStats.lastSentAt ? new Date(mailStats.lastSentAt).toLocaleString() : "No mail history"}</p>
+        </GlassCard>
+
+        <GlassCard padding="sm" className="xl:col-span-2">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2"><ClipboardList size={15} className="text-purple-600" /><h3 className="section-title text-sm">Upcoming Exams</h3></div>
+            <Link to="/exams" className="text-[10px] font-semibold text-blue-600">View All →</Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {upcomingExams.length === 0 ? <p className="py-4 text-xs italic text-muted-foreground">No upcoming exams.</p> : upcomingExams.map((exam: any) => (
+              <Link to="/exams" key={exam.id} className="min-w-[180px] rounded-xl border p-3 hover:bg-slate-50" style={{ borderColor: "var(--color-border)" }}>
+                <p className="truncate text-sm font-bold">{exam.title}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">{exam.scheduledAt ? new Date(exam.scheduledAt).toLocaleDateString() : "Date pending"}</p>
+                <span className="mt-2 inline-block badge badge-blue text-[9px]">{exam.status}</span>
+              </Link>
+            ))}
+          </div>
+        </GlassCard>
+
+        <GlassCard padding="sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2"><BarChart2 size={15} className="text-emerald-600" /><h3 className="section-title text-sm">Engagement Health</h3></div>
+            <Link to="/analytics" className="text-[10px] font-semibold text-blue-600">View All →</Link>
+          </div>
+          <div className="mb-2 flex items-end justify-between"><span className="text-3xl font-black">{engagementSnapshot.avgScore}%</span><span className="text-xs text-muted-foreground">avg score</span></div>
+          <div className="h-2 rounded-full bg-slate-200"><div className="h-2 rounded-full bg-emerald-500" style={{ width: `${Math.min(100, engagementSnapshot.avgScore)}%` }} /></div>
+          <p className="mt-3 text-xs text-muted-foreground">{engagementSnapshot.atRiskCount} at-risk of {engagementSnapshot.studentCount} students · {calendarEventsThisWeek} calendar events this week</p>
+        </GlassCard>
       </div>
     </div>
   );
