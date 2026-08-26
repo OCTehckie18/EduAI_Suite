@@ -24,6 +24,7 @@ scipy
 aiohttp
 nltk
 google-auth>=2.22.0
+google-auth-oauthlib>=1.2.0
 requests
 pytest
 pytest-asyncio
