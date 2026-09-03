@@ -64,3 +64,46 @@ class PendingUserResponse(BaseModel):
 class ApprovalAction(BaseModel):
     """Optional body for deny action."""
     reason: Optional[str] = None
+
+
+class WhitelistStudentRequest(BaseModel):
+    email: EmailStr
+
+
+class TeacherResponse(UserBase):
+    id: int
+    status: Optional[str] = "approved"
+    picture: Optional[str] = None
+    department: Optional[str] = None
+    employee_id: Optional[str] = None
+    last_active: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class StudentResponse(UserBase):
+    id: int
+    status: Optional[str] = "approved"
+    picture: Optional[str] = None
+    registration_number: Optional[str] = None
+    last_active: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserListResponse(BaseModel):
+    users: List[UserResponse]
+    total: int
+    page: int
+    limit: int
+    has_next: bool
+    has_prev: bool
+
+
+class BulkOperationResponse(BaseModel):
+    processed: int
+    successful: int
+    failed: int
+    errors: List[str] = []
