@@ -14,7 +14,7 @@
 
 ## Overview
 
-EduAI Suite is a comprehensive, open-source monorepo designed to revolutionize education through AI-assisted teaching, student learning, assessments, collaboration, and real-time classroom activities. Built with modern technologies, it provides two interconnected React applications powered by a shared FastAPI backend service.
+  EduAI Suite is a comprehensive, open-source monorepo designed to revolutionize education through AI-assisted teaching, student learning, assessments, collaboration, and real-time classroom activities. Built with modern technologies, it provides two interconnected React applications powered by a shared FastAPI backend service.
 
 > **Key Innovation**: EduAI Suite uniquely combines AI-powered features (via Groq) with collaborative tools (Trello-style planning, real-time WebSockets) and comprehensive assessment systems (OMR processing, automated grading) to create an all-in-one educational platform.
 
