@@ -95,3 +95,4 @@ backend/uploads/
 !TESTING_README.md
 
 .codebase-memory
+.claude
